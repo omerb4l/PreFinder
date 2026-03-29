@@ -1,17 +1,20 @@
 ```mermaid
-graph LR
-    A[Aktif İlanlar] --> B{Oyuncu Lobi Arıyor}
-    B --> C[Otomatik Rank Filtresi]
-    C --> D[Uygun Lobi Bulundu]
-    D --> E[Party Kodunu Kopyala ve Oyuna Gir]
+graph TD
+    A[Uygun Lobi Bulundu] --> B[Katılma İsteği Gönder]
+    B --> C[Lobi Kurucusuna Gerçek Zamanlı Bildirim Gider]
     
-    E --> F{Oyun İçi Durum}
-    F -- Sorun Yok --> G[Maç Oynanır]
-    F -- Geçersiz Kod / Troll --> H[Uygulamadan Şikayet Et]
+    C --> D{Kurucu Profili İnceler}
+    note1[Kurucu şunları görür:<br>- Rütbe<br>- Main Ajanlar<br>- Yıldız Puanı] -.-> D
     
-    H --> I[Admin İncelemesi]
-    I -- Haklı Şikayet --> J[Riot ID Kara Listeye Alınır / Kalıcı Ban]
+    D -- İsteği Reddet --> E[Kullanıcıya 'Reddedildi' Bildirimi Gider]
+    E --> A
     
-    K[Lobi Kurucu] --> L{Lobi Doldu mu?}
-    L -- Evet --> M[İlanı Sistemden Kaldır]
+    D -- İsteği Kabul Et --> F[Grup Katılım Kodu Kullanıcıya Açılır]
+    F --> G[Kodu Kopyala ve Oyundaki Lobiye Katıl]
+    
+    G --> H{Oyun İçi Durum}
+    H -- Sorun Yok --> I[Maç Oynanır ve Maç Sonu Puanlama Yapılır]
+    H -- Trol/Sabotaj --> J[Uygulamadan Şikayet Et ve 1 Yıldız Ver]
+    
+    J --> K[Admin Kontrolü ve Kalıcı Ban]
 ```
