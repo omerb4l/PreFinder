@@ -3,8 +3,8 @@ import { View, Text, StyleSheet, TouchableOpacity, Image, useWindowDimensions, P
 import { Colors } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { VALORANT_RANKS, RankType } from '@/constants/ranks';
-import { auth, db } from '@/firebaseConfig';
-import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
+import { auth, db } from '../firebaseConfig';
+import { collection, addDoc, serverTimestamp, doc, getDoc, deleteDoc, query, where, getDocs, writeBatch, onSnapshot } from 'firebase/firestore';
 
 interface LobbyCardProps {
   lobbyId: string;
@@ -19,22 +19,24 @@ interface LobbyCardProps {
   avatarUrl?: string;
 }
 
-export const LobbyCard = ({ 
+export const LobbyCard = ({
   lobbyId,
   creatorId,
   gameMode,
-  missingPlayers, 
-  roleInfo, 
-  minRank, 
-  maxRank, 
+  missingPlayers,
+  roleInfo,
+  minRank,
+  maxRank,
   description,
-  rating, 
-  avatarUrl 
+  rating,
+  avatarUrl
 }: LobbyCardProps) => {
   const { width } = useWindowDimensions();
   const isWeb = Platform.OS === 'web' && width >= 768;
-  const [isRequested, setIsRequested] = useState(false);
+  const [requestId, setRequestId] = useState<string | null>(null);
   const [isRequesting, setIsRequesting] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
   const [creatorName, setCreatorName] = useState('Yükleniyor...');
   const [creatorPhoto, setCreatorPhoto] = useState<string | null>(null);
 
@@ -54,9 +56,40 @@ export const LobbyCard = ({
     fetchCreatorData();
   }, [creatorId]);
 
+  // Listen for existing request from current user
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const q = query(
+      collection(db, 'requests'),
+      where('lobbyId', '==', lobbyId),
+      where('requesterId', '==', user.uid),
+      where('status', '==', 'pending')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (!snapshot.empty) {
+        setRequestId(snapshot.docs[0].id);
+      } else {
+        setRequestId(null);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [lobbyId]);
+
+  // Cooldown timer
+  useEffect(() => {
+    if (cooldown > 0) {
+      const timer = setTimeout(() => setCooldown(prev => prev - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [cooldown]);
+
   const minRankInfo = VALORANT_RANKS[minRank];
   const maxRankInfo = VALORANT_RANKS[maxRank];
-  
+
   const currentUser = auth.currentUser;
   const isOwnLobby = currentUser && currentUser.uid === creatorId;
 
@@ -67,6 +100,8 @@ export const LobbyCard = ({
       return;
     }
 
+    if (cooldown > 0) return;
+
     setIsRequesting(true);
     try {
       await addDoc(collection(db, 'requests'), {
@@ -76,13 +111,74 @@ export const LobbyCard = ({
         status: 'pending',
         createdAt: serverTimestamp(),
       });
-      setIsRequested(true);
     } catch (error) {
       console.error('Error sending request:', error);
-      if (Platform.OS === 'web') window.alert('İstek gönderilemedi. Lütfen tekrar deneyin.');
-      else Alert.alert('Hata', 'İstek gönderilemedi. Lütfen tekrar deneyin.');
+      if (Platform.OS === 'web') window.alert('İstek gönderilemedi.');
+      else Alert.alert('Hata', 'İstek gönderilemedi.');
     } finally {
       setIsRequesting(false);
+    }
+  };
+
+  const handleCancelRequest = async () => {
+    if (!requestId) return;
+
+    setIsRequesting(true);
+    try {
+      await deleteDoc(doc(db, 'requests', requestId));
+      setCooldown(10); // 10 second cooldown
+    } catch (error) {
+      console.error('Error canceling request:', error);
+      if (Platform.OS === 'web') window.alert('İstek iptal edilemedi.');
+      else Alert.alert('Hata', 'İstek iptal edilemedi.');
+    } finally {
+      setIsRequesting(false);
+    }
+  };
+
+  const handleCloseLobby = async () => {
+    const confirmClose = () => {
+      return new Promise((resolve) => {
+        if (Platform.OS === 'web') {
+          resolve(window.confirm('Bu lobiyi kapatmak istediğinize emin misiniz? Tüm gelen istekler de silinecektir.'));
+        } else {
+          Alert.alert(
+            'Lobiyi Kapat',
+            'Bu lobiyi kapatmak istediğinize emin misiniz? Tüm gelen istekler de silinecektir.',
+            [
+              { text: 'Vazgeç', onPress: () => resolve(false), style: 'cancel' },
+              { text: 'Lobiyi Kapat', onPress: () => resolve(true), style: 'destructive' },
+            ]
+          );
+        }
+      });
+    };
+
+    const confirmed = await confirmClose();
+    if (!confirmed) return;
+
+    setIsClosing(true);
+    try {
+      // 1. Delete associated requests
+      const q = query(collection(db, 'requests'), where('lobbyId', '==', lobbyId));
+      const querySnapshot = await getDocs(q);
+      const batch = writeBatch(db);
+      querySnapshot.forEach((requestDoc) => {
+        batch.delete(requestDoc.ref);
+      });
+      await batch.commit();
+
+      // 2. Delete the lobby itself
+      await deleteDoc(doc(db, 'lobbies', lobbyId));
+
+      if (Platform.OS === 'web') window.alert('Lobi başarıyla kapatıldı.');
+    } catch (error) {
+      console.error('Error closing lobby:', error);
+      const msg = 'Lobi kapatılamadı. Lütfen tekrar deneyin.';
+      if (Platform.OS === 'web') window.alert(msg);
+      else Alert.alert('Hata', msg);
+    } finally {
+      setIsClosing(false);
     }
   };
 
@@ -94,15 +190,71 @@ export const LobbyCard = ({
     </View>
   );
 
+  const renderActionButton = () => {
+    if (isOwnLobby) {
+      return (
+        <TouchableOpacity
+          style={[styles.actionButton, styles.closeLobbyBtn]}
+          onPress={handleCloseLobby}
+          disabled={isClosing}
+        >
+          {isClosing ? (
+            <ActivityIndicator size="small" color="#FF4655" />
+          ) : (
+            <Text style={styles.closeLobbyText}>{isWeb ? 'Lobiyi Kapat' : 'Kapat'}</Text>
+          )}
+        </TouchableOpacity>
+      );
+    }
+
+    if (requestId) {
+      return (
+        <TouchableOpacity
+          style={[styles.actionButton, styles.cancelBtn]}
+          onPress={handleCancelRequest}
+          disabled={isRequesting}
+        >
+          {isRequesting ? (
+            <ActivityIndicator size="small" color="#FF4655" />
+          ) : (
+            <Text style={styles.cancelBtnText}>İptal Et</Text>
+          )}
+        </TouchableOpacity>
+      );
+    }
+
+    if (cooldown > 0) {
+      return (
+        <View style={[styles.actionButton, styles.cooldownBtn]}>
+          <Text style={styles.cooldownText}>{cooldown}s</Text>
+        </View>
+      );
+    }
+
+    return (
+      <TouchableOpacity
+        style={styles.actionButton}
+        onPress={handleSendRequest}
+        disabled={isRequesting}
+      >
+        {isRequesting ? (
+          <ActivityIndicator size="small" color={Colors.primary} />
+        ) : (
+          <Text style={styles.actionButtonText}>İstek Gönder</Text>
+        )}
+      </TouchableOpacity>
+    );
+  };
+
   if (isWeb) {
     return (
       <View style={styles.webCard}>
         <View style={styles.webLeft}>
           <View style={styles.avatarPlaceholderSmall}>
             {creatorPhoto ? (
-              <Image 
-                source={{ uri: `data:image/jpeg;base64,${creatorPhoto}` }} 
-                style={styles.avatarSmall} 
+              <Image
+                source={{ uri: `data:image/jpeg;base64,${creatorPhoto}` }}
+                style={styles.avatarSmall}
               />
             ) : (
               <Ionicons name="person" size={18} color={Colors.gray} />
@@ -132,26 +284,7 @@ export const LobbyCard = ({
         </View>
 
         <View style={styles.webRight}>
-          {isOwnLobby ? (
-            <View style={styles.ownLobbyBadge}>
-              <Text style={styles.ownLobbyText}>Senin Lobin</Text>
-            </View>
-          ) : (
-            <TouchableOpacity 
-              style={[styles.actionButton, isRequested && styles.actionButtonDisabled]} 
-              activeOpacity={0.7}
-              onPress={handleSendRequest}
-              disabled={isRequested || isRequesting}
-            >
-              {isRequesting ? (
-                <ActivityIndicator size="small" color={Colors.primary} />
-              ) : (
-                <Text style={[styles.actionButtonText, isRequested && styles.actionButtonTextDisabled]}>
-                  {isRequested ? 'İstek Gönderildi' : 'İstek Gönder'}
-                </Text>
-              )}
-            </TouchableOpacity>
-          )}
+          {renderActionButton()}
         </View>
       </View>
     );
@@ -162,9 +295,9 @@ export const LobbyCard = ({
       <View style={styles.leftSection}>
         <View style={styles.avatarPlaceholder}>
           {creatorPhoto ? (
-            <Image 
-              source={{ uri: `data:image/jpeg;base64,${creatorPhoto}` }} 
-              style={styles.avatar} 
+            <Image
+              source={{ uri: `data:image/jpeg;base64,${creatorPhoto}` }}
+              style={styles.avatar}
             />
           ) : (
             <Ionicons name="person" size={24} color={Colors.gray} />
@@ -176,6 +309,7 @@ export const LobbyCard = ({
       </View>
 
       <View style={styles.middleSection}>
+        <Text style={styles.mobileNameText}>{creatorName}</Text>
         <View style={styles.mobileModeBadge}>
           <Text style={styles.mobileModeText}>{gameMode}</Text>
         </View>
@@ -183,39 +317,20 @@ export const LobbyCard = ({
           <Text style={styles.missingPlayersText}>{missingPlayers}</Text>
           <Text style={styles.roleTextMobile}> • {roleInfo}</Text>
         </View>
-        
+
         {description && (
           <Text style={styles.descriptionTextMobile} numberOfLines={2}>
             "{description}"
           </Text>
         )}
-        
+
         <View style={styles.rankWrapperMobile}>
           <RankDisplay />
         </View>
       </View>
 
       <View style={styles.rightSection}>
-        {isOwnLobby ? (
-          <View style={styles.ownLobbyBadge}>
-            <Text style={styles.ownLobbyText}>Senin Lobin</Text>
-          </View>
-        ) : (
-          <TouchableOpacity 
-            style={[styles.actionButton, isRequested && styles.actionButtonDisabled]} 
-            activeOpacity={0.7}
-            onPress={handleSendRequest}
-            disabled={isRequested || isRequesting}
-          >
-            {isRequesting ? (
-              <ActivityIndicator size="small" color={Colors.primary} />
-            ) : (
-              <Text style={[styles.actionButtonText, isRequested && styles.actionButtonTextDisabled]}>
-                {isRequested ? 'İstek Gönderildi' : 'İstek Gönder'}
-              </Text>
-            )}
-          </TouchableOpacity>
-        )}
+        {renderActionButton()}
       </View>
     </View>
   );
@@ -362,6 +477,12 @@ const styles = StyleSheet.create({
   middleSection: {
     flex: 1,
   },
+  mobileNameText: {
+    color: Colors.text,
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
   missingPlayersText: {
     color: Colors.primary,
     fontSize: 16,
@@ -408,6 +529,33 @@ const styles = StyleSheet.create({
   ownLobbyText: {
     color: Colors.text,
     fontSize: 12,
+    fontWeight: '700',
+  },
+  closeLobbyBtn: {
+    borderColor: '#FF4655',
+    backgroundColor: 'rgba(255, 70, 85, 0.05)',
+  },
+  closeLobbyText: {
+    color: '#FF4655',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  cancelBtn: {
+    borderColor: '#FF4655',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  cancelBtnText: {
+    color: '#FF4655',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  cooldownBtn: {
+    borderColor: Colors.gray,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  cooldownText: {
+    color: Colors.gray,
+    fontSize: 13,
     fontWeight: '700',
   },
   webModeBadge: {

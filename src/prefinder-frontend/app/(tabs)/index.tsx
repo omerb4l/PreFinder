@@ -5,7 +5,7 @@ import { LobbyCard } from '@/components/LobbyCard';
 import { CreateLobbyModal } from '@/components/CreateLobbyModal';
 import { Ionicons } from '@expo/vector-icons';
 import { RankType } from '@/constants/ranks';
-import { db } from '@/firebaseConfig';
+import { auth, db } from '@/firebaseConfig';
 import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 
 interface Lobby {
@@ -48,6 +48,7 @@ export default function DashboardScreen() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [lobbies, setLobbies] = useState<Lobby[]>([]);
   const [loading, setLoading] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
   
   // Filters
   const [filterMode, setFilterMode] = useState("Tüm Modlar");
@@ -79,7 +80,24 @@ export default function DashboardScreen() {
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    const user = auth.currentUser;
+    let unsubscribeNotifications = () => {};
+
+    if (user) {
+      const qNotify = query(
+        collection(db, 'requests'),
+        where('receiverId', '==', user.uid),
+        where('status', '==', 'pending')
+      );
+      unsubscribeNotifications = onSnapshot(qNotify, (snapshot) => {
+        setUnreadCount(snapshot.size);
+      }, (err) => console.error("Notification listener error:", err));
+    }
+
+    return () => {
+      unsubscribe();
+      unsubscribeNotifications();
+    };
   }, []);
 
   const filteredLobbies = lobbies.filter(lobby => {
@@ -94,7 +112,31 @@ export default function DashboardScreen() {
     }
     
     return matchesMode && matchesRank;
+  }).sort((a, b) => {
+    // Pin user's own lobby to top
+    const isAUser = a.creatorId === auth?.currentUser?.uid;
+    const isBUser = b.creatorId === auth?.currentUser?.uid;
+    if (isAUser && !isBUser) return -1;
+    if (!isAUser && isBUser) return 1;
+    
+    // Otherwise sort by time (newest first)
+    const tA = a.createdAt?.toMillis() || 0;
+    const tB = b.createdAt?.toMillis() || 0;
+    return tB - tA;
   });
+
+  const handleOpenCreateModal = () => {
+    const hasActiveLobby = lobbies.some(lobby => lobby.creatorId === auth?.currentUser?.uid);
+    
+    if (hasActiveLobby) {
+      const msg = "Zaten aktif bir lobiniz var. Yeni bir lobi kurmadan önce mevcut lobinizi kapatmalısınız.";
+      if (Platform.OS === 'web') window.alert(msg);
+      else Alert.alert("Hata", msg);
+      return;
+    }
+    
+    setIsModalOpen(true);
+  };
 
   const FilterModal = () => (
     <Modal visible={activeFilterModal !== null} transparent animationType="fade" onRequestClose={() => setActiveFilterModal(null)}>
@@ -194,7 +236,7 @@ export default function DashboardScreen() {
           <TouchableOpacity
             style={styles.fab}
             activeOpacity={0.9}
-            onPress={() => setIsModalOpen(true)}
+            onPress={handleOpenCreateModal}
           >
             <Text style={styles.fabText}>+ LOBİ OLUŞTUR</Text>
           </TouchableOpacity>
@@ -325,6 +367,28 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginBottom: 16,
     textAlign: 'center',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+  },
+  notificationButton: {
+    position: 'relative',
+    padding: 4,
+  },
+  badge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#FF4655',
+    borderWidth: 2,
+    borderColor: '#0F1923', // Match background color
   },
   modalItem: {
     flexDirection: 'row',

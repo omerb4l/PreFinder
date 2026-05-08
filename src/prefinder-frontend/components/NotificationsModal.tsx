@@ -34,7 +34,10 @@ export const NotificationsModal = ({ isVisible, onClose }: NotificationsModalPro
 
   useEffect(() => {
     const user = auth.currentUser;
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
     setLoading(true);
 
@@ -46,34 +49,47 @@ export const NotificationsModal = ({ isVisible, onClose }: NotificationsModalPro
     );
 
     const unsubIncoming = onSnapshot(qIncoming, async (snapshot) => {
-      const incomingPromises = snapshot.docs.map(async (docSnap) => {
-        const data = docSnap.data();
-        let requesterName = 'Bilinmeyen';
-        let requesterPhoto = null;
-        let requesterRank: RankType = 'platinum'; // Default or from data
-        
-        // Fetch requester data
-        const userRef = doc(db, 'users', data.requesterId);
-        const userSnap = await getDoc(userRef);
-        if (userSnap.exists()) {
-          const uData = userSnap.data();
-          requesterName = uData.username || 'Bilinmeyen';
-          requesterPhoto = uData.profilePicBase64 || null;
-          requesterRank = uData.rank || 'platinum';
-        }
+      try {
+        const incomingPromises = snapshot.docs.map(async (docSnap) => {
+          const data = docSnap.data();
+          if (!data) return null;
 
-        return {
-          id: docSnap.id,
-          type: 'incoming' as const,
-          ...data,
-          requesterName,
-          requesterPhoto,
-          requesterRank
-        } as AppNotification;
-      });
+          let requesterName = 'Bilinmeyen';
+          let requesterPhoto = null;
+          let requesterRank: RankType = 'platinum';
+          
+          try {
+            const userRef = doc(db, 'users', data.requesterId);
+            const userSnap = await getDoc(userRef);
+            if (userSnap.exists()) {
+              const uData = userSnap.data();
+              requesterName = uData.username || 'Bilinmeyen';
+              requesterPhoto = uData.profilePicBase64 || null;
+              requesterRank = uData.rank || 'platinum';
+            }
+          } catch (err) {
+            console.warn(`Could not fetch data for requester ${data.requesterId}:`, err);
+          }
 
-      const incomingData = await Promise.all(incomingPromises);
-      updateNotifications('incoming', incomingData);
+          return {
+            id: docSnap.id,
+            type: 'incoming' as const,
+            ...data,
+            requesterName,
+            requesterPhoto,
+            requesterRank
+          } as AppNotification;
+        });
+
+        const incomingData = (await Promise.all(incomingPromises)).filter(Boolean) as AppNotification[];
+        updateNotifications('incoming', incomingData);
+      } catch (error: any) {
+        console.error('Firestore Incoming Snapshot Error:', error);
+        setLoading(false);
+      }
+    }, (error) => {
+      console.error('Firestore Incoming Listener Error:', error);
+      setLoading(false);
     });
 
     // 2. Listen for Accepted Requests (where user is requester)
@@ -84,29 +100,41 @@ export const NotificationsModal = ({ isVisible, onClose }: NotificationsModalPro
     );
 
     const unsubAccepted = onSnapshot(qAccepted, async (snapshot) => {
-      const acceptedDataPromises = snapshot.docs.map(async (requestDoc) => {
-        const data = requestDoc.data();
-        let partyCode = 'Bilinmiyor';
-        
-        // Fetch party code from lobby
-        if (data.lobbyId) {
-          const lobbyRef = doc(db, 'lobbies', data.lobbyId);
-          const lobbySnap = await getDoc(lobbyRef);
-          if (lobbySnap.exists() && lobbySnap.data().partyCode) {
-            partyCode = lobbySnap.data().partyCode;
+      try {
+        const acceptedDataPromises = snapshot.docs.map(async (requestDoc) => {
+          const data = requestDoc.data();
+          if (!data) return null;
+          let partyCode = 'Bilinmiyor';
+          
+          try {
+            if (data.lobbyId) {
+              const lobbyRef = doc(db, 'lobbies', data.lobbyId);
+              const lobbySnap = await getDoc(lobbyRef);
+              if (lobbySnap.exists() && lobbySnap.data().partyCode) {
+                partyCode = lobbySnap.data().partyCode;
+              }
+            }
+          } catch (err) {
+            console.warn(`Could not fetch party code for lobby ${data.lobbyId}:`, err);
           }
-        }
 
-        return {
-          id: requestDoc.id,
-          type: 'accepted' as const,
-          ...data,
-          partyCode
-        } as AppNotification;
-      });
+          return {
+            id: requestDoc.id,
+            type: 'accepted' as const,
+            ...data,
+            partyCode
+          } as AppNotification;
+        });
 
-      const acceptedData = await Promise.all(acceptedDataPromises);
-      updateNotifications('accepted', acceptedData);
+        const acceptedData = (await Promise.all(acceptedDataPromises)).filter(Boolean) as AppNotification[];
+        updateNotifications('accepted', acceptedData);
+      } catch (error: any) {
+        console.error('Firestore Accepted Snapshot Error:', error);
+        setLoading(false);
+      }
+    }, (error) => {
+      console.error('Firestore Accepted Listener Error:', error);
+      setLoading(false);
     });
 
     // Helper to merge the two streams
