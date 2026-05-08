@@ -4,12 +4,12 @@ import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBPU__ZoNbWs1AsNmk_zuCybxNNl6T4mXw",
-  authDomain: "prefinder-f04c4.firebaseapp.com",
-  projectId: "prefinder-f04c4",
-  storageBucket: "prefinder-f04c4.firebasestorage.app",
-  messagingSenderId: "1043098676018",
-  appId: "1:1043098676018:web:d78467bd83a8b604fd052b"
+  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID
 };
 
 const app = initializeApp(firebaseConfig);
