@@ -9,6 +9,7 @@ import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/fires
 interface LobbyCardProps {
   lobbyId: string;
   creatorId: string;
+  gameMode: string;
   missingPlayers: string;
   roleInfo: string;
   minRank: RankType;
@@ -21,6 +22,7 @@ interface LobbyCardProps {
 export const LobbyCard = ({ 
   lobbyId,
   creatorId,
+  gameMode,
   missingPlayers, 
   roleInfo, 
   minRank, 
@@ -114,6 +116,9 @@ export const LobbyCard = ({
 
         <View style={styles.webCenterLeft}>
           <View style={styles.row}>
+            <View style={styles.webModeBadge}>
+              <Text style={styles.webModeText}>{gameMode}</Text>
+            </View>
             <View style={styles.missingBadgeSmall}>
               <Text style={styles.missingTextSmall}>{missingPlayers}</Text>
             </View>
@@ -171,6 +176,9 @@ export const LobbyCard = ({
       </View>
 
       <View style={styles.middleSection}>
+        <View style={styles.mobileModeBadge}>
+          <Text style={styles.mobileModeText}>{gameMode}</Text>
+        </View>
         <View style={styles.row}>
           <Text style={styles.missingPlayersText}>{missingPlayers}</Text>
           <Text style={styles.roleTextMobile}> • {roleInfo}</Text>
@@ -317,13 +325,14 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 16,
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 12,
     width: '100%',
   },
   leftSection: {
     alignItems: 'center',
     marginRight: 16,
+    paddingTop: 4, // Align with the start of the text
   },
   avatarPlaceholder: {
     width: 48,
@@ -369,6 +378,7 @@ const styles = StyleSheet.create({
   },
   rightSection: {
     marginLeft: 12,
+    paddingTop: 4,
   },
   actionButton: {
     borderWidth: 1,
@@ -399,5 +409,36 @@ const styles = StyleSheet.create({
     color: Colors.text,
     fontSize: 12,
     fontWeight: '700',
+  },
+  webModeBadge: {
+    backgroundColor: 'rgba(255, 70, 85, 0.15)',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#FF4655',
+  },
+  webModeText: {
+    color: '#FF4655',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  mobileModeBadge: {
+    backgroundColor: 'rgba(255, 70, 85, 0.15)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 4,
+    alignSelf: 'flex-start',
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#FF4655',
+  },
+  mobileModeText: {
+    color: '#FF4655',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
 });

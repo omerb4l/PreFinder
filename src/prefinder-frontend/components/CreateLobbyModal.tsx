@@ -29,9 +29,16 @@ const ROLES = [
   { id: 'any', name: 'Farketmez (Any)', icon: 'help-circle' },
 ];
 
-
+const GAME_MODES = [
+  "Rekabete Dayalı",
+  "Derecesiz",
+  "Tam Gaz",
+  "Ölüm Kalım Savaşı",
+  "Prömiyer"
+];
 
 export const CreateLobbyModal = ({ isVisible, onClose }: CreateLobbyModalProps) => {
+  const [gameMode, setGameMode] = useState("Rekabete Dayalı");
   const [missingCount, setMissingCount] = useState(1);
   const [selectedRoles, setSelectedRoles] = useState<string[]>(['any']);
   const [description, setDescription] = useState('');
@@ -82,6 +89,7 @@ export const CreateLobbyModal = ({ isVisible, onClose }: CreateLobbyModalProps) 
     try {
       await addDoc(collection(db, 'lobbies'), {
         creatorId: user.uid,
+        gameMode,
         missingPlayers: missingCount,
         roles: selectedRoles,
         minRank,
@@ -92,6 +100,7 @@ export const CreateLobbyModal = ({ isVisible, onClose }: CreateLobbyModalProps) 
         createdAt: serverTimestamp(),
       });
       // Reset form and close
+      setGameMode("Rekabete Dayalı");
       setMissingCount(1);
       setSelectedRoles(['any']);
       setDescription('');
@@ -187,6 +196,25 @@ export const CreateLobbyModal = ({ isVisible, onClose }: CreateLobbyModalProps) 
           {/* ---- MAIN FORM (hidden behind picker when open) ---- */}
           {!activePicker && (
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              
+              {/* Game Mode Selection */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Oyun Modu</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.modeScroll}>
+                  {GAME_MODES.map((mode) => (
+                    <TouchableOpacity
+                      key={mode}
+                      style={[styles.modeBadge, gameMode === mode && styles.modeBadgeActive]}
+                      onPress={() => setGameMode(mode)}
+                    >
+                      <Text style={[styles.modeBadgeText, gameMode === mode && styles.modeBadgeTextActive]}>
+                        {mode}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+
               {/* Player Count */}
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Eksik Kişi Sayısı</Text>
@@ -388,6 +416,30 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginBottom: 8,
+  },
+  modeScroll: {
+    gap: 8,
+    paddingRight: 20,
+  },
+  modeBadge: {
+    backgroundColor: '#0F1923',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  modeBadgeActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  modeBadgeText: {
+    color: Colors.gray,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  modeBadgeTextActive: {
+    color: '#0F1923',
   },
   counterRow: {
     flexDirection: 'row',

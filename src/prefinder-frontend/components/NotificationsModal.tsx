@@ -6,6 +6,9 @@ import * as Clipboard from 'expo-clipboard';
 import { auth, db } from '@/firebaseConfig';
 import { collection, query, where, onSnapshot, doc, updateDoc, getDoc } from 'firebase/firestore';
 
+import { VALORANT_RANKS, RankType } from '@/constants/ranks';
+import { Image } from 'react-native';
+
 interface NotificationsModalProps {
   isVisible: boolean;
   onClose: () => void;
@@ -19,7 +22,10 @@ interface AppNotification {
   receiverId: string;
   status: string;
   createdAt: any;
-  partyCode?: string; // For accepted
+  partyCode?: string;
+  requesterName?: string;
+  requesterPhoto?: string;
+  requesterRank?: RankType;
 }
 
 export const NotificationsModal = ({ isVisible, onClose }: NotificationsModalProps) => {
@@ -39,13 +45,34 @@ export const NotificationsModal = ({ isVisible, onClose }: NotificationsModalPro
       where('status', '==', 'pending')
     );
 
-    const unsubIncoming = onSnapshot(qIncoming, (snapshot) => {
-      const incomingData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        type: 'incoming' as const,
-        ...doc.data()
-      })) as AppNotification[];
-      
+    const unsubIncoming = onSnapshot(qIncoming, async (snapshot) => {
+      const incomingPromises = snapshot.docs.map(async (docSnap) => {
+        const data = docSnap.data();
+        let requesterName = 'Bilinmeyen';
+        let requesterPhoto = null;
+        let requesterRank: RankType = 'platinum'; // Default or from data
+        
+        // Fetch requester data
+        const userRef = doc(db, 'users', data.requesterId);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) {
+          const uData = userSnap.data();
+          requesterName = uData.username || 'Bilinmeyen';
+          requesterPhoto = uData.profilePicBase64 || null;
+          requesterRank = uData.rank || 'platinum';
+        }
+
+        return {
+          id: docSnap.id,
+          type: 'incoming' as const,
+          ...data,
+          requesterName,
+          requesterPhoto,
+          requesterRank
+        } as AppNotification;
+      });
+
+      const incomingData = await Promise.all(incomingPromises);
       updateNotifications('incoming', incomingData);
     });
 
@@ -162,7 +189,37 @@ export const NotificationsModal = ({ isVisible, onClose }: NotificationsModalPro
                           <Ionicons name="people" size={16} color="#3498db" />
                           <Text style={styles.notifTime}>Yeni İstek</Text>
                         </View>
-                        <Text style={styles.notifText}>Bir oyuncu lobinize katılmak istiyor.</Text>
+                        
+                        <View style={styles.requesterCard}>
+                          <View style={styles.requesterInfo}>
+                            {notif.requesterPhoto ? (
+                              <Image 
+                                source={{ uri: `data:image/jpeg;base64,${notif.requesterPhoto}` }} 
+                                style={styles.requesterAvatar} 
+                              />
+                            ) : (
+                              <View style={styles.requesterAvatarPlaceholder}>
+                                <Ionicons name="person" size={20} color={Colors.gray} />
+                              </View>
+                            )}
+                            <View>
+                              <Text style={styles.requesterName}>{notif.requesterName}</Text>
+                              <View style={styles.rankBadgeSmall}>
+                                {notif.requesterRank && (
+                                  <Image 
+                                    source={VALORANT_RANKS[notif.requesterRank].icon} 
+                                    style={styles.rankIconSmall} 
+                                  />
+                                )}
+                                <Text style={styles.rankTextSmall}>
+                                  {notif.requesterRank ? VALORANT_RANKS[notif.requesterRank].name : 'Belirsiz'}
+                                </Text>
+                              </View>
+                            </View>
+                          </View>
+                        </View>
+
+                        <Text style={styles.notifText}>Bu oyuncu lobinize katılmak istiyor.</Text>
                         <View style={styles.actionButtons}>
                           <TouchableOpacity 
                             style={[styles.btn, styles.acceptBtn]}
@@ -281,6 +338,54 @@ const styles = StyleSheet.create({
     color: Colors.text,
     fontSize: 13,
     lineHeight: 18,
+    marginTop: 4,
+  },
+  requesterCard: {
+    backgroundColor: '#0F1923',
+    borderRadius: 8,
+    padding: 10,
+    marginVertical: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  requesterInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  requesterAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+  },
+  requesterAvatarPlaceholder: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  requesterName: {
+    color: Colors.text,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  rankBadgeSmall: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
+  rankIconSmall: {
+    width: 14,
+    height: 14,
+    resizeMode: 'contain',
+  },
+  rankTextSmall: {
+    color: Colors.gray,
+    fontSize: 11,
+    fontWeight: '600',
   },
   codeText: {
     color: Colors.primary,

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, Platform, useWindowDimensions, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, Platform, useWindowDimensions, ActivityIndicator, Modal, ScrollView } from 'react-native';
 import { Colors } from '@/constants/theme';
 import { LobbyCard } from '@/components/LobbyCard';
 import { CreateLobbyModal } from '@/components/CreateLobbyModal';
@@ -21,16 +21,40 @@ interface Lobby {
   createdAt: any;
 }
 
+const GAME_MODES = ["Tüm Modlar", "Rekabete Dayalı", "Derecesiz", "Tam Gaz", "Ölüm Kalım Savaşı", "Prömiyer"];
+const RANKS = [
+  { label: "Tüm Ranklar", value: "all" },
+  { label: "Iron", value: "iron" },
+  { label: "Bronze", value: "bronze" },
+  { label: "Silver", value: "silver" },
+  { label: "Gold", value: "gold" },
+  { label: "Platinum", value: "platinum" },
+  { label: "Diamond", value: "diamond" },
+  { label: "Ascendant", value: "ascendant" },
+  { label: "Immortal", value: "immortal" },
+  { label: "Radiant", value: "radiant" },
+];
+
+const RANK_WEIGHTS: Record<string, number> = {
+  'iron': 1, 'bronze': 2, 'silver': 3, 'gold': 4, 'platinum': 5,
+  'diamond': 6, 'ascendant': 7, 'immortal': 8, 'radiant': 9, 'all': 0
+};
+
 export default function DashboardScreen() {
   const { width } = useWindowDimensions();
   const isWeb = Platform.OS === 'web' && width >= 768;
   const isMobile = width < 768;
+  
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [lobbies, setLobbies] = useState<Lobby[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Filters
+  const [filterMode, setFilterMode] = useState("Tüm Modlar");
+  const [filterRank, setFilterRank] = useState(RANKS[0]);
+  const [activeFilterModal, setActiveFilterModal] = useState<'mode' | 'rank' | null>(null);
 
   useEffect(() => {
-    // Real-time Firestore listener: only active lobbies
     const q = query(
       collection(db, 'lobbies'),
       where('status', '==', 'active')
@@ -42,7 +66,6 @@ export default function DashboardScreen() {
         ...doc.data(),
       } as Lobby));
       
-      // Client-side sort to avoid Firestore composite index requirement
       data.sort((a, b) => {
         const tA = a.createdAt?.toMillis() || 0;
         const tB = b.createdAt?.toMillis() || 0;
@@ -56,15 +79,61 @@ export default function DashboardScreen() {
       setLoading(false);
     });
 
-    // Cleanup listener on unmount
     return () => unsubscribe();
   }, []);
+
+  const filteredLobbies = lobbies.filter(lobby => {
+    const matchesMode = filterMode === "Tüm Modlar" || lobby.gameMode === filterMode;
+    
+    let matchesRank = true;
+    if (filterRank.value !== "all") {
+      const fWeight = RANK_WEIGHTS[filterRank.value];
+      const minWeight = RANK_WEIGHTS[lobby.minRank] || 0;
+      const maxWeight = RANK_WEIGHTS[lobby.maxRank] || 0;
+      matchesRank = fWeight >= minWeight && fWeight <= maxWeight;
+    }
+    
+    return matchesMode && matchesRank;
+  });
+
+  const FilterModal = () => (
+    <Modal visible={activeFilterModal !== null} transparent animationType="fade" onRequestClose={() => setActiveFilterModal(null)}>
+      <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setActiveFilterModal(null)}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>
+            {activeFilterModal === 'mode' ? 'Mod Seçin' : 'Rank Seçin'}
+          </Text>
+          <ScrollView>
+            {(activeFilterModal === 'mode' ? GAME_MODES : RANKS).map((item: any) => {
+              const label = typeof item === 'string' ? item : item.label;
+              const isSelected = activeFilterModal === 'mode' ? filterMode === item : filterRank.value === item.value;
+              
+              return (
+                <TouchableOpacity 
+                  key={label} 
+                  style={[styles.modalItem, isSelected && styles.modalItemSelected]}
+                  onPress={() => {
+                    if (activeFilterModal === 'mode') setFilterMode(item);
+                    else setFilterRank(item);
+                    setActiveFilterModal(null);
+                  }}
+                >
+                  <Text style={[styles.modalItemText, isSelected && styles.modalItemTextSelected]}>{label}</Text>
+                  {isSelected && <Ionicons name="checkmark" size={18} color={Colors.primary} />}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      </TouchableOpacity>
+    </Modal>
+  );
 
   const renderEmpty = () => (
     <View style={styles.emptyContainer}>
       <Ionicons name="search-outline" size={48} color={Colors.gray} />
       <Text style={styles.emptyTitle}>Aktif lobi bulunamadı</Text>
-      <Text style={styles.emptySubtitle}>İlk lobiyi sen oluştur!</Text>
+      <Text style={styles.emptySubtitle}>Filtreleri değiştirmeyi veya yeni lobi oluşturmayı dene!</Text>
     </View>
   );
 
@@ -72,6 +141,7 @@ export default function DashboardScreen() {
     <LobbyCard
       lobbyId={item.id}
       creatorId={item.creatorId}
+      gameMode={item.gameMode}
       missingPlayers={`+${item.missingPlayers} Kişi`}
       roleInfo={item.roles.join(', ')}
       minRank={item.minRank}
@@ -91,7 +161,7 @@ export default function DashboardScreen() {
           </View>
         ) : (
           <FlatList
-            data={lobbies}
+            data={filteredLobbies}
             keyExtractor={(item) => item.id}
             renderItem={renderLobby}
             ListEmptyComponent={renderEmpty}
@@ -99,12 +169,12 @@ export default function DashboardScreen() {
               <View style={styles.listHeader}>
                 {isWeb && <Text style={styles.pageTitle}>Aktif Lobiler</Text>}
                 <View style={styles.filtersRow}>
-                  <TouchableOpacity style={styles.filterButton}>
-                    <Text style={styles.filterButtonText}>Tüm Modlar</Text>
+                  <TouchableOpacity style={styles.filterButton} onPress={() => setActiveFilterModal('mode')}>
+                    <Text style={styles.filterButtonText}>{filterMode}</Text>
                     <Ionicons name="chevron-down" size={16} color={Colors.gray} />
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.filterButton}>
-                    <Text style={styles.filterButtonText}>Rank Filtresi</Text>
+                  <TouchableOpacity style={styles.filterButton} onPress={() => setActiveFilterModal('rank')}>
+                    <Text style={styles.filterButtonText}>{filterRank.label}</Text>
                     <Ionicons name="chevron-down" size={16} color={Colors.gray} />
                   </TouchableOpacity>
                 </View>
@@ -131,6 +201,7 @@ export default function DashboardScreen() {
         )}
 
         <CreateLobbyModal isVisible={isModalOpen} onClose={() => setIsModalOpen(false)} />
+        <FilterModal />
       </View>
     </SafeAreaView>
   );
@@ -229,5 +300,51 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
     letterSpacing: 0.5,
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    width: '100%',
+    maxWidth: 340,
+    maxHeight: '70%',
+    padding: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  modalTitle: {
+    color: Colors.text,
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  modalItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginBottom: 4,
+  },
+  modalItemSelected: {
+    backgroundColor: 'rgba(0, 255, 135, 0.05)',
+  },
+  modalItemText: {
+    color: Colors.gray,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  modalItemTextSelected: {
+    color: Colors.primary,
+    fontWeight: '700',
   },
 });
