@@ -274,6 +274,15 @@ export default function ForumScreen() {
                       <Text style={styles.postTitle}>{post.title}</Text>
                       <Text style={styles.postContent} numberOfLines={3}>{post.content}</Text>
 
+                      {post.base64Image ? (
+                        <View style={styles.postCardImageContainer}>
+                          <Image 
+                            source={{ uri: `data:image/jpeg;base64,${post.base64Image}` }} 
+                            style={styles.postCardImage} 
+                          />
+                        </View>
+                      ) : null}
+
                       <View style={styles.postCardFooter}>
                         <View style={styles.footerLeft}>
                           <TouchableOpacity 
@@ -542,5 +551,20 @@ const styles = StyleSheet.create({
     color: '#0F1923',
     fontWeight: '800',
     fontSize: 14,
+  },
+  postCardImageContainer: {
+    width: '100%',
+    height: 180,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  postCardImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
 });
