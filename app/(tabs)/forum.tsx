@@ -1,95 +1,162 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, SafeAreaView, Platform, useWindowDimensions, Pressable } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, SafeAreaView, Platform, useWindowDimensions, Pressable, ActivityIndicator, Image } from 'react-native';
 import { Colors } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { auth, db } from '@/firebaseConfig';
+import { collection, query, orderBy, onSnapshot, doc, getDoc, runTransaction, arrayUnion, arrayRemove } from 'firebase/firestore';
 
 interface ForumPost {
   id: string;
-  author: string;
-  authorRank: string;
   title: string;
-  content: string;
-  likes: number;
-  comments: number;
   category: string;
-  time: string;
-  likedByUser: boolean;
+  content: string;
+  authorId: string;
+  authorRiotId: string;
+  base64Image?: string | null;
+  createdAt: any;
+  likesCount: number;
+  commentsCount: number;
+  likedBy: string[];
 }
 
 const CATEGORIES = ["Tümü", "Haberler", "Rehberler", "Takım Bul", "Sohbet", "Taktikler"];
 
-const INITIAL_POSTS: ForumPost[] = [
-  {
-    id: "1",
-    author: "ViperMain99",
-    authorRank: "Elmas 3",
-    title: "10.02 Yaması Ajan Güncellemeleri Hakkında Düşünceleriniz?",
-    content: "Yeni yamada Viper perdelerinin süresi kısaltılmış gibi hissediyorum. Sizce Viper hala meta mı yoksa Brimstone'a mı yönelmeliyiz? Taktiklerinizi bekliyorum.",
-    likes: 24,
-    comments: 12,
-    category: "Haberler",
-    time: "2 saat önce",
-    likedByUser: false
-  },
-  {
-    id: "2",
-    author: "JettFlyer",
-    authorRank: "Ölümsüz 1",
-    title: "Solo Queue Rank Atlamak İçin En İyi 3 Düellocu",
-    content: "Uzun araştırmalarım ve maç geçmişime dayanarak solo queue'da en kolay rank atlayabileceğiniz düellocuları listeledim. 1. Jett, 2. Reyna, 3. Iso. Detaylı rehber yakında profilde!",
-    likes: 42,
-    comments: 8,
-    category: "Rehberler",
-    time: "5 saat önce",
-    likedByUser: false
-  },
-  {
-    id: "3",
-    author: "SupportSage",
-    authorRank: "Platin 2",
-    title: "Akşamüstü 18:00'da Platin-Elmas Lobiye 2 Kişi Arıyoruz",
-    content: "Toksik olmayan, info veren, uyumlu Sage/Skye main veya düellocu arıyoruz. Discord adresi üzerinden iletişim kurabilirsiniz. Riot ID ekleyin oynayalım.",
-    likes: 8,
-    comments: 19,
-    category: "Takım Bul",
-    time: "10 dakika önce",
-    likedByUser: false
-  },
-  {
-    id: "4",
-    author: "AimGod_Vlr",
-    authorRank: "Yücelik 2",
-    title: "Aim Geliştirme Rutini (Günde Sadece 30 Dakika)",
-    content: "The Range ve Aimlabs kullanarak oluşturduğum 30 dakikalık rutini paylaşıyorum. Sadece 1 haftada headshot oranım %18'den %27'ye yükseldi. Sorularınızı sorabilirsiniz.",
-    likes: 56,
-    comments: 15,
-    category: "Taktikler",
-    time: "1 gün önce",
-    likedByUser: false
-  }
-];
-
 export default function ForumScreen() {
   const { width } = useWindowDimensions();
   const isWeb = Platform.OS === 'web' && width >= 768;
+  const router = useRouter();
 
-  const [posts, setPosts] = useState<ForumPost[]>(INITIAL_POSTS);
+  const [posts, setPosts] = useState<ForumPost[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState("Tümü");
   const [searchQuery, setSearchQuery] = useState("");
+  
+  // Cache user profiles to show author avatars and ranks dynamically
+  const [userProfiles, setUserProfiles] = useState<Record<string, { profilePicBase64?: string; rank?: string }>>({});
 
-  const handleLike = (id: string) => {
-    setPosts(prevPosts => 
-      prevPosts.map(post => {
-        if (post.id === id) {
-          return {
-            ...post,
-            likedByUser: !post.likedByUser,
-            likes: post.likedByUser ? post.likes - 1 : post.likes + 1
-          };
+  // 1. Fetch posts in real-time
+  useEffect(() => {
+    const postsRef = collection(db, 'forum_posts');
+    const q = query(postsRef, orderBy('createdAt', 'desc'));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetchedPosts: ForumPost[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        fetchedPosts.push({
+          id: docSnap.id,
+          title: data.title || '',
+          category: data.category || 'Sohbet',
+          content: data.content || '',
+          authorId: data.authorId || '',
+          authorRiotId: data.authorRiotId || 'Bilinmeyen',
+          base64Image: data.base64Image || null,
+          createdAt: data.createdAt,
+          likesCount: data.likesCount || 0,
+          commentsCount: data.commentsCount || 0,
+          likedBy: data.likedBy || [],
+        });
+      });
+      setPosts(fetchedPosts);
+      setLoading(false);
+    }, (error) => {
+      console.error("Error fetching forum posts:", error);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // 2. Fetch and cache author profiles dynamically
+  useEffect(() => {
+    const missingAuthorIds = posts
+      .map(p => p.authorId)
+      .filter(id => id && !userProfiles[id]);
+
+    if (missingAuthorIds.length === 0) return;
+
+    const fetchProfiles = async () => {
+      const newProfiles = { ...userProfiles };
+      let updated = false;
+
+      await Promise.all(
+        missingAuthorIds.map(async (id) => {
+          try {
+            const userDoc = await getDoc(doc(db, 'users', id));
+            if (userDoc.exists()) {
+              const data = userDoc.data();
+              newProfiles[id] = {
+                profilePicBase64: data.profilePicBase64 || undefined,
+                rank: data.rank || 'Derecesiz',
+              };
+            } else {
+              newProfiles[id] = { rank: 'Derecesiz' };
+            }
+            updated = true;
+          } catch (e) {
+            console.warn("Error fetching user profile for ID:", id, e);
+            newProfiles[id] = { rank: 'Derecesiz' };
+            updated = true;
+          }
+        })
+      );
+
+      if (updated) {
+        setUserProfiles(newProfiles);
+      }
+    };
+
+    fetchProfiles();
+  }, [posts]);
+
+  // 3. Handle like toggle from feed
+  const handleLike = async (postId: string, likedBy: string[]) => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const postRef = doc(db, 'forum_posts', postId);
+    const isLiked = likedBy && likedBy.includes(user.uid);
+
+    try {
+      await runTransaction(db, async (transaction) => {
+        const postDoc = await transaction.get(postRef);
+        if (!postDoc.exists()) return;
+
+        const currentLikedBy = postDoc.data().likedBy || [];
+        const currentLikesCount = postDoc.data().likesCount || 0;
+
+        if (isLiked) {
+          transaction.update(postRef, {
+            likedBy: arrayRemove(user.uid),
+            likesCount: Math.max(0, currentLikesCount - 1),
+          });
+        } else {
+          transaction.update(postRef, {
+            likedBy: arrayUnion(user.uid),
+            likesCount: currentLikesCount + 1,
+          });
         }
-        return post;
-      })
-    );
+      });
+    } catch (error) {
+      console.error("Like transaction failed from feed:", error);
+    }
+  };
+
+  // 4. Helper to format timestamp
+  const formatTime = (createdAt: any) => {
+    if (!createdAt) return 'Şimdi';
+    const date = createdAt.toDate ? createdAt.toDate() : new Date(createdAt);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 1) return 'Şimdi';
+    if (diffMins < 60) return `${diffMins} dk önce`;
+    if (diffHours < 24) return `${diffHours} saat önce`;
+    return `${diffDays} gün önce`;
   };
 
   const filteredPosts = posts.filter(post => {
@@ -101,125 +168,152 @@ export default function ForumScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView 
-        style={styles.container}
-        contentContainerStyle={[styles.contentPadding, isWeb && styles.webContentPadding]}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.header}>
-          <Text style={styles.title}>Topluluk Forumu</Text>
-          <Text style={styles.subtitle}>Fikirlerinizi paylaşın, taktik alışverişinde bulunun.</Text>
-        </View>
-
-        {/* Search Bar */}
-        <View style={styles.searchContainer}>
-          <Ionicons name="search-outline" size={20} color={Colors.gray} style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Forumda arama yapın..."
-            placeholderTextColor={Colors.gray}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          {searchQuery !== "" && (
-            <TouchableOpacity onPress={() => setSearchQuery("")} style={styles.clearSearchBtn}>
-              <Ionicons name="close-circle" size={18} color={Colors.gray} />
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Category List */}
+      <View style={{ flex: 1, position: 'relative' }}>
         <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoryList}
+          style={styles.container}
+          contentContainerStyle={[styles.contentPadding, isWeb && styles.webContentPadding, { paddingBottom: 100 }]}
+          showsVerticalScrollIndicator={false}
         >
-          {CATEGORIES.map(category => (
-            <TouchableOpacity
-              key={category}
-              style={[
-                styles.categoryBadge,
-                selectedCategory === category && styles.categoryBadgeActive
-              ]}
-              onPress={() => setSelectedCategory(category)}
-            >
-              <Text style={[
-                styles.categoryBadgeText,
-                selectedCategory === category && styles.categoryBadgeTextActive
-              ]}>
-                {category}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        {/* Coming Soon Notice Card */}
-        <View style={styles.comingSoonCard}>
-          <View style={styles.comingSoonHeader}>
-            <Ionicons name="construct" size={24} color={Colors.primary} />
-            <Text style={styles.comingSoonTitle}>Etkileşimli Forum Yakında!</Text>
+          <View style={styles.header}>
+            <Text style={styles.title}>Topluluk Forumu</Text>
+            <Text style={styles.subtitle}>Fikirlerinizi paylaşın, taktik alışverişinde bulunun.</Text>
           </View>
-          <Text style={styles.comingSoonText}>
-            Çok yakında kendi konularınızı açabilecek, diğer oyuncuların gönderilerine yorum yapabilecek ve toplulukla anlık etkileşime girebileceksiniz. Şu anda önizleme sürümündesiniz.
-          </Text>
-        </View>
 
-        {/* Posts List */}
-        <View style={styles.postsList}>
-          {filteredPosts.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Ionicons name="chatbox-ellipses-outline" size={48} color={Colors.gray} />
-              <Text style={styles.emptyText}>Aradığınız kriterlere uygun konu bulunamadı.</Text>
+          {/* Search Bar */}
+          <View style={styles.searchContainer}>
+            <Ionicons name="search-outline" size={20} color={Colors.gray} style={styles.searchIcon} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Forumda arama yapın..."
+              placeholderTextColor={Colors.gray}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery !== "" && (
+              <TouchableOpacity onPress={() => setSearchQuery("")} style={styles.clearSearchBtn}>
+                <Ionicons name="close-circle" size={18} color={Colors.gray} />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Category List */}
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoryList}
+          >
+            {CATEGORIES.map(category => (
+              <TouchableOpacity
+                key={category}
+                style={[
+                  styles.categoryBadge,
+                  selectedCategory === category && styles.categoryBadgeActive
+                ]}
+                onPress={() => setSelectedCategory(category)}
+              >
+                <Text style={[
+                  styles.categoryBadgeText,
+                  selectedCategory === category && styles.categoryBadgeTextActive
+                ]}>
+                  {category}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          {/* Posts List */}
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={Colors.primary} />
             </View>
           ) : (
-            filteredPosts.map(post => (
-              <View key={post.id} style={styles.postCard}>
-                <View style={styles.postCardHeader}>
-                  <View style={styles.authorBox}>
-                    <View style={styles.avatarPlaceholder}>
-                      <Ionicons name="person" size={14} color={Colors.gray} />
-                    </View>
-                    <View>
-                      <Text style={styles.authorName}>{post.author}</Text>
-                      <Text style={styles.authorRankText}>{post.authorRank}</Text>
-                    </View>
-                  </View>
-                  <View style={styles.categoryLabel}>
-                    <Text style={styles.categoryLabelText}>{post.category}</Text>
-                  </View>
+            <View style={styles.postsList}>
+              {filteredPosts.length === 0 ? (
+                <View style={styles.emptyContainer}>
+                  <Ionicons name="chatbox-ellipses-outline" size={48} color={Colors.gray} />
+                  <Text style={styles.emptyText}>Aradığınız kriterlere uygun konu bulunamadı.</Text>
                 </View>
+              ) : (
+                filteredPosts.map(post => {
+                  const isLiked = post.likedBy && auth.currentUser && post.likedBy.includes(auth.currentUser.uid);
+                  const profile = userProfiles[post.authorId];
+                  const avatarUri = profile?.profilePicBase64;
+                  const rank = profile?.rank || 'Derecesiz';
 
-                <Text style={styles.postTitle}>{post.title}</Text>
-                <Text style={styles.postContent}>{post.content}</Text>
-
-                <View style={styles.postCardFooter}>
-                  <View style={styles.footerLeft}>
-                    <TouchableOpacity 
-                      style={[styles.interactionBtn, post.likedByUser && styles.likedBtn]} 
-                      onPress={() => handleLike(post.id)}
+                  return (
+                    <Pressable 
+                      key={post.id} 
+                      style={styles.postCard}
+                      onPress={() => router.push({
+                        pathname: '/forum-detail',
+                        params: { postId: post.id }
+                      })}
                     >
-                      <Ionicons 
-                        name={post.likedByUser ? "heart" : "heart-outline"} 
-                        size={18} 
-                        color={post.likedByUser ? Colors.danger : Colors.gray} 
-                      />
-                      <Text style={[styles.interactionText, post.likedByUser && styles.likedText]}>
-                        {post.likes} Beğeni
-                      </Text>
-                    </TouchableOpacity>
+                      <View style={styles.postCardHeader}>
+                        <View style={styles.authorBox}>
+                          <View style={styles.avatarPlaceholder}>
+                            {avatarUri ? (
+                              <Image 
+                                source={{ uri: `data:image/jpeg;base64,${avatarUri}` }} 
+                                style={styles.avatarImage} 
+                              />
+                            ) : (
+                              <Ionicons name="person" size={14} color={Colors.gray} />
+                            )}
+                          </View>
+                          <View>
+                            <Text style={styles.authorName}>{post.authorRiotId}</Text>
+                            <Text style={styles.authorRankText}>{rank}</Text>
+                          </View>
+                        </View>
+                        <View style={styles.categoryLabel}>
+                          <Text style={styles.categoryLabelText}>{post.category}</Text>
+                        </View>
+                      </View>
 
-                    <View style={styles.interactionBtn}>
-                      <Ionicons name="chatbubble-outline" size={18} color={Colors.gray} />
-                      <Text style={styles.interactionText}>{post.comments} Yorum</Text>
-                    </View>
-                  </View>
-                  <Text style={styles.postTime}>{post.time}</Text>
-                </View>
-              </View>
-            ))
+                      <Text style={styles.postTitle}>{post.title}</Text>
+                      <Text style={styles.postContent} numberOfLines={3}>{post.content}</Text>
+
+                      <View style={styles.postCardFooter}>
+                        <View style={styles.footerLeft}>
+                          <TouchableOpacity 
+                            style={[styles.interactionBtn, isLiked && styles.likedBtn]} 
+                            onPress={() => handleLike(post.id, post.likedBy)}
+                          >
+                            <Ionicons 
+                              name={isLiked ? "heart" : "heart-outline"} 
+                              size={18} 
+                              color={isLiked ? Colors.danger : Colors.gray} 
+                            />
+                            <Text style={[styles.interactionText, isLiked && styles.likedText]}>
+                              {post.likesCount} Beğeni
+                            </Text>
+                          </TouchableOpacity>
+
+                          <View style={styles.interactionBtn}>
+                            <Ionicons name="chatbubble-outline" size={18} color={Colors.gray} />
+                            <Text style={styles.interactionText}>{post.commentsCount} Yorum</Text>
+                          </View>
+                        </View>
+                        <Text style={styles.postTime}>{formatTime(post.createdAt)}</Text>
+                      </View>
+                    </Pressable>
+                  );
+                })
+              )}
+            </View>
           )}
-        </View>
-      </ScrollView>
+        </ScrollView>
+
+        {/* Floating Action Button */}
+        <TouchableOpacity 
+          style={[styles.fab, isWeb && styles.webFab]} 
+          onPress={() => router.push('/forum-create')}
+        >
+          <Ionicons name="add" size={22} color="#0F1923" />
+          <Text style={styles.fabText}>Yeni Konu Aç</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
@@ -300,31 +394,6 @@ const styles = StyleSheet.create({
   categoryBadgeTextActive: {
     color: '#0F1923',
   },
-  comingSoonCard: {
-    backgroundColor: 'rgba(255, 70, 85, 0.05)',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 70, 85, 0.2)',
-    marginBottom: 24,
-  },
-  comingSoonHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 8,
-  },
-  comingSoonTitle: {
-    color: Colors.primary,
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  comingSoonText: {
-    color: Colors.text,
-    fontSize: 13,
-    lineHeight: 18,
-    opacity: 0.8,
-  },
   postsList: {
     gap: 16,
   },
@@ -355,6 +424,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
   },
   authorName: {
     color: Colors.text,
@@ -435,5 +510,37 @@ const styles = StyleSheet.create({
     color: Colors.gray,
     fontSize: 14,
     textAlign: 'center',
+  },
+  loadingContainer: {
+    paddingVertical: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    backgroundColor: Colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 6,
+    gap: 6,
+  },
+  webFab: {
+    right: '20%',
+    marginRight: 20,
+    bottom: 30,
+  },
+  fabText: {
+    color: '#0F1923',
+    fontWeight: '800',
+    fontSize: 14,
   },
 });
