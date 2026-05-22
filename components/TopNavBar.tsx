@@ -66,8 +66,13 @@ export const TopNavBar = ({ onOpenNotifications, hasUnread = false }: TopNavBarP
               Oyuncu Şikayet Et
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.navLink}>
-            <Text style={styles.navLinkText}>Forum</Text>
+          <TouchableOpacity 
+            style={styles.navLink}
+            onPress={() => router.push('/forum')}
+          >
+            <Text style={[styles.navLinkText, isActive('/forum') && styles.navLinkActive]}>
+              Forum
+            </Text>
           </TouchableOpacity>
         </View>
       )}
