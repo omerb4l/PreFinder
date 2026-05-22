@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, SafeAreaView, Platform, useWindowDimensions, ActivityIndicator, TouchableOpacity, FlatList } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, SafeAreaView, Platform, useWindowDimensions, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Colors } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { VALORANT_RANKS } from '@/constants/ranks';
 import { auth, db } from '@/firebaseConfig';
-import { doc, onSnapshot, collection, query, where, getDocs, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, onSnapshot, collection, query, where, getDocs, getDoc } from 'firebase/firestore';
 import { EditProfileModal } from '@/components/EditProfileModal';
 import { PrimaryButton } from '@/components/PrimaryButton';
 

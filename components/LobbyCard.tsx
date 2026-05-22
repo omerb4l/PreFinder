@@ -378,7 +378,7 @@ export const LobbyCard = ({
 
           {!!description && (
             <Text style={styles.descriptionTextMobile} numberOfLines={2}>
-              "{description}"
+              {`"${description}"`}
             </Text>
           )}
 

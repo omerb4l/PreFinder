@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Platform, ActivityIndicator, Image } from 'react-native';
 import { Colors } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
@@ -8,7 +8,6 @@ import { collection, query, where, onSnapshot, doc, updateDoc, getDoc } from 'fi
 import { useRouter } from 'expo-router';
 
 import { VALORANT_RANKS, RankType } from '@/constants/ranks';
-import { Image } from 'react-native';
 
 interface NotificationsModalProps {
   isVisible: boolean;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, Image, ScrollView, ActivityIndicator, Alert, Platform, Linking, Modal } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, Image, ScrollView, ActivityIndicator, Alert, Platform, Modal } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Colors } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';

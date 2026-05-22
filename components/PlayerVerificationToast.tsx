@@ -65,7 +65,7 @@ export const PlayerVerificationToast = () => {
     };
 
     fetchPlayerName();
-  }, [activeRequest?.requesterId]);
+  }, [activeRequest]);
 
   const handleAction = async (didJoin: boolean) => {
     if (!activeRequest || processing) return;

@@ -205,7 +205,7 @@ export default function CreatePostScreen() {
         ) : (
           <TouchableOpacity style={styles.imagePickerBtn} onPress={pickImage}>
             <Ionicons name="image-outline" size={28} color={Colors.primary} />
-            <Text style={styles.imagePickerText}>Galeri'den Görsel Seç</Text>
+            <Text style={styles.imagePickerText}>{"Galeri'den Görsel Seç"}</Text>
           </TouchableOpacity>
         )}
 

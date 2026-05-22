@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, SafeAreaView, FlatList, Image, ActivityIndicator, KeyboardAvoidingView, Platform, useWindowDimensions, Alert } from 'react-native';
 import { Colors } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
@@ -43,6 +43,7 @@ export default function PostDetailScreen() {
 
   // Cache profiles for comment authors and post author
   const [profiles, setProfiles] = useState<Record<string, { profilePicBase64?: string; rank?: string }>>({});
+  const fetchedProfilesRef = useRef<Set<string>>(new Set());
 
   // 1. Fetch current user's profile info
   useEffect(() => {
@@ -135,11 +136,14 @@ export default function PostDetailScreen() {
     }
     comments.forEach(c => authorIds.add(c.authorId));
 
-    const missingIds = Array.from(authorIds).filter(id => id && !profiles[id]);
+    const missingIds = Array.from(authorIds).filter(id => id && !fetchedProfilesRef.current.has(id));
     if (missingIds.length === 0) return;
 
+    // Mark as fetched immediately to prevent concurrent duplicate calls
+    missingIds.forEach(id => fetchedProfilesRef.current.add(id));
+
     const fetchProfiles = async () => {
-      const newProfiles = { ...profiles };
+      const newProfiles: Record<string, { profilePicBase64?: string; rank?: string }> = {};
       let updated = false;
 
       await Promise.all(
@@ -165,7 +169,7 @@ export default function PostDetailScreen() {
       );
 
       if (updated) {
-        setProfiles(newProfiles);
+        setProfiles(prev => ({ ...prev, ...newProfiles }));
       }
     };
 
@@ -185,7 +189,6 @@ export default function PostDetailScreen() {
         const postDoc = await transaction.get(postRef);
         if (!postDoc.exists()) return;
 
-        const currentLikedBy = postDoc.data().likedBy || [];
         const currentLikesCount = postDoc.data().likesCount || 0;
 
         if (isLiked) {

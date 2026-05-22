@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Image, Modal, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Image, Modal, Alert } from 'react-native';
 import { Colors } from '@/constants/theme';
 import { AuthCard } from '@/components/AuthCard';
 import { CustomTextInput } from '@/components/CustomTextInput';
@@ -38,8 +38,6 @@ export default function VerificationScreen() {
     if (Platform.OS === 'web') {
       window.alert(`${title}: ${message}`);
     } else {
-      // Lazy load Alert to avoid web issues
-      const { Alert } = require('react-native');
       Alert.alert(title, message);
     }
   };

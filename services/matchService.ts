@@ -1,5 +1,5 @@
 import { db } from '@/firebaseConfig';
-import { doc, getDoc, collection, serverTimestamp, increment, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, collection, serverTimestamp, increment, writeBatch, updateDoc } from 'firebase/firestore';
 
 /**
  * Verifies player presence in a lobby and updates statistics accordingly.
@@ -74,6 +74,3 @@ export const verifyPlayerPresence = async (
     throw error;
   }
 };
-
-// Workaround import since updateDoc wasn't imported directly above but referenced in 'else' block
-import { updateDoc } from 'firebase/firestore';

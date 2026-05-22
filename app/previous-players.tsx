@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, SafeAreaView, TouchableOpacity, TextInput, ActivityIndicator, Platform, useWindowDimensions, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/theme';
@@ -35,7 +35,7 @@ export default function PreviousPlayersScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [ratingStates, setRatingStates] = useState<Record<string, { rating: number; note: string; submitting: boolean }>>({});
 
-  const fetchMatchHistory = async () => {
+  const fetchMatchHistory = useCallback(async () => {
     const user = auth.currentUser;
     if (!user) {
       setLoading(false);
@@ -133,11 +133,11 @@ export default function PreviousPlayersScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchMatchHistory();
-  }, []);
+  }, [fetchMatchHistory]);
 
   const onRefresh = () => {
     setRefreshing(true);

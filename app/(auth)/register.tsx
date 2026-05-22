@@ -8,15 +8,6 @@ import { Link, router } from 'expo-router';
 import { auth, db } from '@/firebaseConfig';
 import { createUserWithEmailAndPassword, sendEmailVerification, signOut } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-
-function showError(title: string, msg: string) {
-  if (Platform.OS === 'web') {
-    window.alert(`${title}\n\n${msg}`);
-  } else {
-    Alert.alert(title, msg);
-  }
-}
-
 export default function RegisterScreen() {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, SafeAreaView, Platform, useWindowDimensions, Pressable, ActivityIndicator, Image } from 'react-native';
 import { Colors } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
@@ -68,16 +68,21 @@ export default function ForumScreen() {
     return () => unsubscribe();
   }, []);
 
+  const fetchedAuthorIdsRef = useRef<Set<string>>(new Set());
+
   // 2. Fetch and cache author profiles dynamically
   useEffect(() => {
     const missingAuthorIds = posts
       .map(p => p.authorId)
-      .filter(id => id && !userProfiles[id]);
+      .filter(id => id && !fetchedAuthorIdsRef.current.has(id));
 
     if (missingAuthorIds.length === 0) return;
 
+    // Mark as fetched immediately to prevent concurrent duplicate calls
+    missingAuthorIds.forEach(id => fetchedAuthorIdsRef.current.add(id));
+
     const fetchProfiles = async () => {
-      const newProfiles = { ...userProfiles };
+      const newProfiles: Record<string, { profilePicBase64?: string; rank?: string }> = {};
       let updated = false;
 
       await Promise.all(
@@ -103,7 +108,7 @@ export default function ForumScreen() {
       );
 
       if (updated) {
-        setUserProfiles(newProfiles);
+        setUserProfiles(prev => ({ ...prev, ...newProfiles }));
       }
     };
 
@@ -123,7 +128,6 @@ export default function ForumScreen() {
         const postDoc = await transaction.get(postRef);
         if (!postDoc.exists()) return;
 
-        const currentLikedBy = postDoc.data().likedBy || [];
         const currentLikesCount = postDoc.data().likesCount || 0;
 
         if (isLiked) {

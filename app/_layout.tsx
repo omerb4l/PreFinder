@@ -5,7 +5,6 @@ import { StatusBar } from 'expo-status-bar';
 import { Alert, Platform } from 'react-native';
 import 'react-native-reanimated';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { auth, db } from '@/firebaseConfig';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
@@ -15,7 +14,6 @@ export const unstable_settings = {
 };
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
 
   useEffect(() => {
     let unsubUserDoc: (() => void) | undefined;

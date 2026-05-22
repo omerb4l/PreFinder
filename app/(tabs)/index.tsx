@@ -6,7 +6,7 @@ import { CreateLobbyModal } from '@/components/CreateLobbyModal';
 import { Ionicons } from '@expo/vector-icons';
 import { RankType } from '@/constants/ranks';
 import { auth, db } from '@/firebaseConfig';
-import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 
 interface Lobby {
   id: string;
@@ -49,7 +49,6 @@ export default function DashboardScreen() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [lobbies, setLobbies] = useState<Lobby[]>([]);
   const [loading, setLoading] = useState(true);
-  const [unreadCount, setUnreadCount] = useState(0);
   
   // Filters
   const [filterMode, setFilterMode] = useState("Tüm Modlar");
@@ -81,23 +80,8 @@ export default function DashboardScreen() {
       setLoading(false);
     });
 
-    const user = auth.currentUser;
-    let unsubscribeNotifications = () => {};
-
-    if (user) {
-      const qNotify = query(
-        collection(db, 'requests'),
-        where('receiverId', '==', user.uid),
-        where('status', '==', 'pending')
-      );
-      unsubscribeNotifications = onSnapshot(qNotify, (snapshot) => {
-        setUnreadCount(snapshot.size);
-      }, (err) => console.error("Notification listener error:", err));
-    }
-
     return () => {
       unsubscribe();
-      unsubscribeNotifications();
     };
   }, []);
 
