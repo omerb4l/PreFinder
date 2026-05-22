@@ -325,7 +325,13 @@ export default function PostDetailScreen() {
             <View style={styles.postDetailsContainer}>
               {/* Author & Info */}
               <View style={styles.postCardHeader}>
-                <View style={styles.authorBox}>
+                <TouchableOpacity 
+                  style={styles.authorBox}
+                  onPress={() => router.push({
+                    pathname: '/profile',
+                    params: { targetUserId: post.authorId }
+                  })}
+                >
                   <View style={styles.avatarPlaceholder}>
                     {postAuthorAvatar ? (
                       <Image 
@@ -340,7 +346,7 @@ export default function PostDetailScreen() {
                     <Text style={styles.authorName}>{post.authorRiotId}</Text>
                     <Text style={styles.authorRankText}>{postAuthorRank}</Text>
                   </View>
-                </View>
+                </TouchableOpacity>
                 <View style={styles.categoryLabel}>
                   <Text style={styles.categoryLabelText}>{post.category}</Text>
                 </View>
@@ -396,7 +402,13 @@ export default function PostDetailScreen() {
             return (
               <View style={styles.commentCard}>
                 <View style={styles.commentHeader}>
-                  <View style={styles.commentAuthorBox}>
+                  <TouchableOpacity 
+                    style={styles.commentAuthorBox}
+                    onPress={() => router.push({
+                      pathname: '/profile',
+                      params: { targetUserId: item.authorId }
+                    })}
+                  >
                     <View style={styles.commentAvatarPlaceholder}>
                       {commentAvatar ? (
                         <Image 
@@ -411,7 +423,7 @@ export default function PostDetailScreen() {
                       <Text style={styles.commentAuthorName}>{item.authorRiotId}</Text>
                       <Text style={styles.commentAuthorRankText}>{commentRank}</Text>
                     </View>
-                  </View>
+                  </TouchableOpacity>
                   <Text style={styles.commentTime}>{formatTime(item.createdAt)}</Text>
                 </View>
                 <Text style={styles.commentContent}>{item.content}</Text>

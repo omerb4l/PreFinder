@@ -254,7 +254,13 @@ export default function ForumScreen() {
                       })}
                     >
                       <View style={styles.postCardHeader}>
-                        <View style={styles.authorBox}>
+                        <TouchableOpacity 
+                          style={styles.authorBox}
+                          onPress={() => router.push({
+                            pathname: '/profile',
+                            params: { targetUserId: post.authorId }
+                          })}
+                        >
                           <View style={styles.avatarPlaceholder}>
                             {avatarUri ? (
                               <Image 
@@ -269,7 +275,7 @@ export default function ForumScreen() {
                             <Text style={styles.authorName}>{post.authorRiotId}</Text>
                             <Text style={styles.authorRankText}>{rank}</Text>
                           </View>
-                        </View>
+                        </TouchableOpacity>
                         <View style={styles.categoryLabel}>
                           <Text style={styles.categoryLabelText}>{post.category}</Text>
                         </View>

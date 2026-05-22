@@ -38,6 +38,13 @@ export default function ProfileScreen() {
   const [loadingReviews, setLoadingReviews] = useState(false);
   const [calculatedAverage, setCalculatedAverage] = useState<number | null>(null);
 
+  // Tabs states
+  const [activeTab, setActiveTab] = useState<'reviews' | 'posts' | 'comments'>('reviews');
+  const [userPosts, setUserPosts] = useState<any[]>([]);
+  const [loadingPosts, setLoadingPosts] = useState(false);
+  const [userComments, setUserComments] = useState<any[]>([]);
+  const [loadingComments, setLoadingComments] = useState(false);
+
 
 
   // 1. Listen for user document changes
@@ -161,6 +168,92 @@ export default function ProfileScreen() {
     };
 
     fetchReviews();
+  }, [displayUserId]);
+
+  // 3. Fetch forum posts for target user
+  useEffect(() => {
+    if (!displayUserId) return;
+
+    const fetchUserPosts = async () => {
+      setLoadingPosts(true);
+      try {
+        const postsRef = collection(db, 'forum_posts');
+        const qPosts = query(postsRef, where('authorId', '==', displayUserId));
+        const snapPosts = await getDocs(qPosts);
+        
+        const fetchedPosts: any[] = [];
+        snapPosts.forEach((docSnap) => {
+          fetchedPosts.push({ id: docSnap.id, ...docSnap.data() });
+        });
+
+        // Sort client-side by createdAt descending
+        fetchedPosts.sort((a, b) => {
+          const tA = a.createdAt?.toMillis ? a.createdAt.toMillis() : (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0);
+          const tB = b.createdAt?.toMillis ? b.createdAt.toMillis() : (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0);
+          return tB - tA;
+        });
+
+        setUserPosts(fetchedPosts);
+      } catch (err) {
+        console.error('Error fetching user forum posts:', err);
+      } finally {
+        setLoadingPosts(false);
+      }
+    };
+
+    fetchUserPosts();
+  }, [displayUserId]);
+
+  // 4. Fetch forum comments/replies for target user
+  useEffect(() => {
+    if (!displayUserId) return;
+
+    const fetchUserComments = async () => {
+      setLoadingComments(true);
+      try {
+        const commentsRef = collection(db, 'forum_comments');
+        const qComments = query(commentsRef, where('authorId', '==', displayUserId));
+        const snapComments = await getDocs(qComments);
+        
+        const rawComments: any[] = [];
+        snapComments.forEach((docSnap) => {
+          rawComments.push({ id: docSnap.id, ...docSnap.data() });
+        });
+
+        // Sort client-side by createdAt descending
+        rawComments.sort((a, b) => {
+          const tA = a.createdAt?.toMillis ? a.createdAt.toMillis() : (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0);
+          const tB = b.createdAt?.toMillis ? b.createdAt.toMillis() : (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0);
+          return tB - tA;
+        });
+
+        // Fetch parent post title for each comment to make it look premium
+        const enrichedCommentsPromises = rawComments.slice(0, 20).map(async (comm) => {
+          let postTitle = 'Silinmiş Konu';
+          try {
+            const postDoc = await getDoc(doc(db, 'forum_posts', comm.postId));
+            if (postDoc.exists()) {
+              postTitle = postDoc.data().title || 'Başlıksız Konu';
+            }
+          } catch (e) {
+            console.warn('Error fetching parent post title:', e);
+          }
+          return {
+            ...comm,
+            postTitle
+          };
+        });
+
+        const enrichedComments = await Promise.all(enrichedCommentsPromises);
+        setUserComments(enrichedComments);
+      } catch (err) {
+        console.error('Error fetching user forum comments:', err);
+      } finally {
+        setLoadingComments(false);
+      }
+    };
+
+    fetchUserComments();
   }, [displayUserId]);
 
   if (loading) {
@@ -352,54 +445,183 @@ export default function ProfileScreen() {
           )}
         </View>
 
-        {/* Teammate reviews list: Oyuncu Yorumları */}
-        <View style={styles.reviewsSection}>
-          <Text style={styles.reviewsTitle}>Oyuncu Yorumları ({reviews.length})</Text>
+        {/* Tab Switcher */}
+        <View style={styles.tabsContainer}>
+          <TouchableOpacity 
+            style={[styles.tabButton, activeTab === 'reviews' && styles.tabButtonActive]}
+            onPress={() => setActiveTab('reviews')}
+          >
+            <Text style={[styles.tabButtonText, activeTab === 'reviews' && styles.tabButtonTextActive]}>
+              Değerlendirmeler ({reviews.length})
+            </Text>
+          </TouchableOpacity>
 
-          {loadingReviews ? (
-            <ActivityIndicator size="small" color={Colors.primary} style={{ marginTop: 20 }} />
-          ) : reviews.length === 0 ? (
-            <View style={styles.emptyReviews}>
-              <Ionicons name="chatbox-ellipses-outline" size={32} color={Colors.gray} />
-              <Text style={styles.emptyReviewsText}>Bu oyuncu hakkında henüz yazılı bir yorum yapılmamış.</Text>
-            </View>
-          ) : (
-            reviews.map((item) => {
-              const dateStr = item.timestamp?.toDate()
-                ? item.timestamp.toDate().toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-                : 'Bilinmiyor';
+          <TouchableOpacity 
+            style={[styles.tabButton, activeTab === 'posts' && styles.tabButtonActive]}
+            onPress={() => setActiveTab('posts')}
+          >
+            <Text style={[styles.tabButtonText, activeTab === 'posts' && styles.tabButtonTextActive]}>
+              Konular ({userPosts.length})
+            </Text>
+          </TouchableOpacity>
 
-              return (
-                <View key={item.id} style={styles.reviewCard}>
-                  <View style={styles.reviewHeader}>
-                    <View style={styles.reviewerInfo}>
-                      <View style={styles.reviewerAvatarWrapper}>
-                        {item.reviewerPhoto ? (
-                          <Image 
-                            source={{ uri: `data:image/jpeg;base64,${item.reviewerPhoto}` }} 
-                            style={styles.reviewerAvatar} 
-                          />
-                        ) : (
-                          <Ionicons name="person" size={14} color={Colors.gray} />
-                        )}
-                      </View>
-                      <Text style={styles.reviewerName}>{item.reviewerName}</Text>
-                    </View>
-                    <Text style={styles.reviewDate}>{dateStr}</Text>
-                  </View>
-
-                  <View style={styles.reviewRatingRow}>
-                    {renderStarIcons(item.rating)}
-                  </View>
-
-                  <Text style={styles.reviewNote}>
-                    {item.note.trim() || `${item.rating} Yıldızlı Değerlendirme`}
-                  </Text>
-                </View>
-              );
-            })
-          )}
+          <TouchableOpacity 
+            style={[styles.tabButton, activeTab === 'comments' && styles.tabButtonActive]}
+            onPress={() => setActiveTab('comments')}
+          >
+            <Text style={[styles.tabButtonText, activeTab === 'comments' && styles.tabButtonTextActive]}>
+              Yanıtlar ({userComments.length})
+            </Text>
+          </TouchableOpacity>
         </View>
+
+        {activeTab === 'reviews' && (
+          <View style={styles.reviewsSection}>
+            <Text style={styles.reviewsTitle}>Oyuncu Yorumları ({reviews.length})</Text>
+
+            {loadingReviews ? (
+              <ActivityIndicator size="small" color={Colors.primary} style={{ marginTop: 20 }} />
+            ) : reviews.length === 0 ? (
+              <View style={styles.emptyReviews}>
+                <Ionicons name="chatbox-ellipses-outline" size={32} color={Colors.gray} />
+                <Text style={styles.emptyReviewsText}>Bu oyuncu hakkında henüz yazılı bir yorum yapılmamış.</Text>
+              </View>
+            ) : (
+              reviews.map((item) => {
+                const dateStr = item.timestamp?.toDate()
+                  ? item.timestamp.toDate().toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                  : 'Bilinmiyor';
+
+                return (
+                  <View key={item.id} style={styles.reviewCard}>
+                    <View style={styles.reviewHeader}>
+                      <View style={styles.reviewerInfo}>
+                        <View style={styles.reviewerAvatarWrapper}>
+                          {item.reviewerPhoto ? (
+                            <Image 
+                              source={{ uri: `data:image/jpeg;base64,${item.reviewerPhoto}` }} 
+                              style={styles.reviewerAvatar} 
+                            />
+                          ) : (
+                            <Ionicons name="person" size={14} color={Colors.gray} />
+                          )}
+                        </View>
+                        <Text style={styles.reviewerName}>{item.reviewerName}</Text>
+                      </View>
+                      <Text style={styles.reviewDate}>{dateStr}</Text>
+                    </View>
+
+                    <View style={styles.reviewRatingRow}>
+                      {renderStarIcons(item.rating)}
+                    </View>
+
+                    <Text style={styles.reviewNote}>
+                      {item.note.trim() || `${item.rating} Yıldızlı Değerlendirme`}
+                    </Text>
+                  </View>
+                );
+              })
+            )}
+          </View>
+        )}
+
+        {activeTab === 'posts' && (
+          <View style={styles.reviewsSection}>
+            <Text style={styles.reviewsTitle}>Açtığı Konular ({userPosts.length})</Text>
+
+            {loadingPosts ? (
+              <ActivityIndicator size="small" color={Colors.primary} style={{ marginTop: 20 }} />
+            ) : userPosts.length === 0 ? (
+              <View style={styles.emptyReviews}>
+                <Ionicons name="chatbox-outline" size={32} color={Colors.gray} />
+                <Text style={styles.emptyReviewsText}>Bu oyuncu henüz forum konusu açmamış.</Text>
+              </View>
+            ) : (
+              userPosts.map((post) => {
+                const postDateStr = post.createdAt?.toDate()
+                  ? post.createdAt.toDate().toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                  : 'Bilinmiyor';
+
+                return (
+                  <TouchableOpacity 
+                    key={post.id} 
+                    style={styles.postCardSmall}
+                    onPress={() => router.push({
+                      pathname: '/forum-detail',
+                      params: { postId: post.id }
+                    })}
+                  >
+                    <View style={styles.postCardHeaderSmall}>
+                      <View style={styles.categoryLabel}>
+                        <Text style={styles.categoryLabelText}>{post.category}</Text>
+                      </View>
+                      <Text style={styles.postTimeSmall}>{postDateStr}</Text>
+                    </View>
+                    <Text style={styles.postTitleSmall} numberOfLines={2}>{post.title}</Text>
+                    <Text style={styles.postContentSmall} numberOfLines={3}>{post.content}</Text>
+                    
+                    <View style={styles.postCardFooterSmall}>
+                      <View style={{ flexDirection: 'row', gap: 12 }}>
+                        <View style={styles.interactionBtnSmall}>
+                          <Ionicons name="heart-outline" size={14} color={Colors.gray} />
+                          <Text style={styles.interactionTextSmall}>{post.likesCount || 0} Beğeni</Text>
+                        </View>
+                        <View style={styles.interactionBtnSmall}>
+                          <Ionicons name="chatbubble-outline" size={14} color={Colors.gray} />
+                          <Text style={styles.interactionTextSmall}>{post.commentsCount || 0} Yorum</Text>
+                        </View>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })
+            )}
+          </View>
+        )}
+
+        {activeTab === 'comments' && (
+          <View style={styles.reviewsSection}>
+            <Text style={styles.reviewsTitle}>Yazdığı Yanıtlar ({userComments.length})</Text>
+
+            {loadingComments ? (
+              <ActivityIndicator size="small" color={Colors.primary} style={{ marginTop: 20 }} />
+            ) : userComments.length === 0 ? (
+              <View style={styles.emptyReviews}>
+                <Ionicons name="chatbubbles-outline" size={32} color={Colors.gray} />
+                <Text style={styles.emptyReviewsText}>Bu oyuncu henüz bir konuya yanıt yazmamış.</Text>
+              </View>
+            ) : (
+              userComments.map((comment) => {
+                const commentDateStr = comment.createdAt?.toDate()
+                  ? comment.createdAt.toDate().toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                  : 'Bilinmiyor';
+
+                return (
+                  <TouchableOpacity 
+                    key={comment.id} 
+                    style={styles.commentCardSmall}
+                    onPress={() => router.push({
+                      pathname: '/forum-detail',
+                      params: { postId: comment.postId }
+                    })}
+                  >
+                    <View style={styles.commentCardHeaderSmall}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1 }}>
+                        <Ionicons name="arrow-undo-outline" size={14} color={Colors.primary} />
+                        <Text style={styles.commentParentTitleSmall} numberOfLines={1}>
+                          Konu: {comment.postTitle}
+                        </Text>
+                      </View>
+                      <Text style={styles.commentTimeSmall}>{commentDateStr}</Text>
+                    </View>
+                    <Text style={styles.commentContentSmall}>{comment.content}</Text>
+                    <Text style={styles.viewThreadText}>Konuyu Görüntüle →</Text>
+                  </TouchableOpacity>
+                );
+              })
+            )}
+          </View>
+        )}
 
         <EditProfileModal 
           isVisible={isEditModalVisible} 
@@ -754,5 +976,133 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 6,
     textAlign: 'center',
+  },
+  tabsContainer: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+    marginBottom: 20,
+    marginTop: 10,
+    width: '100%',
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  tabButtonActive: {
+    borderBottomColor: Colors.primary,
+  },
+  tabButtonText: {
+    color: Colors.gray,
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  tabButtonTextActive: {
+    color: Colors.primary,
+  },
+  postCardSmall: {
+    backgroundColor: Colors.surface,
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.04)',
+  },
+  postCardHeaderSmall: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  postTimeSmall: {
+    color: Colors.gray,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  postTitleSmall: {
+    color: Colors.text,
+    fontSize: 15,
+    fontWeight: '800',
+    marginBottom: 6,
+  },
+  postContentSmall: {
+    color: Colors.gray,
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 10,
+  },
+  postCardFooterSmall: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.02)',
+    paddingTop: 8,
+  },
+  interactionBtnSmall: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  interactionTextSmall: {
+    color: Colors.gray,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  categoryLabel: {
+    backgroundColor: 'rgba(0, 255, 135, 0.08)',
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 135, 0.15)',
+  },
+  categoryLabelText: {
+    color: Colors.primary,
+    fontSize: 10,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  commentCardSmall: {
+    backgroundColor: Colors.surface,
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.04)',
+  },
+  commentCardHeaderSmall: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  commentParentTitleSmall: {
+    color: Colors.text,
+    fontSize: 12,
+    fontWeight: '700',
+    flex: 1,
+  },
+  commentTimeSmall: {
+    color: Colors.gray,
+    fontSize: 11,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  commentContentSmall: {
+    color: Colors.text,
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 8,
+  },
+  viewThreadText: {
+    color: Colors.primary,
+    fontSize: 12,
+    fontWeight: '700',
+    alignSelf: 'flex-end',
   },
 });
