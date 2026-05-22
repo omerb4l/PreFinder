@@ -4,7 +4,7 @@ import { Colors } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { auth, db } from '@/firebaseConfig';
-import { doc, onSnapshot, collection, query, where, orderBy, addDoc, serverTimestamp, runTransaction, getDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, onSnapshot, collection, query, where, addDoc, serverTimestamp, runTransaction, getDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 
 interface ForumPost {
   id: string;
@@ -103,8 +103,7 @@ export default function PostDetailScreen() {
     const commentsRef = collection(db, 'forum_comments');
     const q = query(
       commentsRef,
-      where('postId', '==', postId),
-      orderBy('createdAt', 'asc')
+      where('postId', '==', postId)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -120,6 +119,14 @@ export default function PostDetailScreen() {
           createdAt: data.createdAt,
         });
       });
+
+      // Sort client-side by createdAt ascending to avoid index requirement
+      fetchedComments.sort((a, b) => {
+        const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0);
+        const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0);
+        return timeA - timeB;
+      });
+
       setComments(fetchedComments);
     }, (error) => {
       console.error("Error listening to comments:", error);
