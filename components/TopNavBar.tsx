@@ -20,7 +20,7 @@ export const TopNavBar = ({ onOpenNotifications, hasUnread = false }: TopNavBarP
   const [profilePic, setProfilePic] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+    const unsubscribeAuth = auth.onAuthStateChanged((user: any) => {
       if (user) {
         const unsubUser = onSnapshot(doc(db, 'users', user.uid), (doc) => {
           if (doc.exists()) {

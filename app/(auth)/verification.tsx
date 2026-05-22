@@ -30,6 +30,7 @@ export default function VerificationScreen() {
   const [profilePicUri, setProfilePicUri] = useState<string | null>(null);
   const [profilePicBase64, setProfilePicBase64] = useState<string | null>(null);
   const [verificationPicUri, setVerificationPicUri] = useState<string | null>(null);
+  const [verificationPicBase64, setVerificationPicBase64] = useState<string | null>(null);
   const [isRankModalVisible, setIsRankModalVisible] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -65,14 +66,22 @@ export default function VerificationScreen() {
   };
 
   const pickVerificationPic = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      showAlert('İzin Gerekli', 'Galeri izni verilmedi.');
+      return;
+    }
+
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: false,
-      quality: 0.5,
+      allowsEditing: true,
+      quality: 0.1,
+      base64: true,
     });
 
-    if (!result.canceled) {
+    if (!result.canceled && result.assets && result.assets.length > 0) {
       setVerificationPicUri(result.assets[0].uri);
+      setVerificationPicBase64(`data:image/jpeg;base64,${result.assets[0].base64}`);
     }
   };
 
@@ -88,6 +97,11 @@ export default function VerificationScreen() {
       return;
     }
     
+    if (!verificationPicBase64) {
+      showAlert('Hata', 'Lütfen rütbenizi kanıtlayan bir ekran görüntüsü yükleyin.');
+      return;
+    }
+
     const user = auth.currentUser;
     if (!user) {
       showAlert('Hata', 'Kullanıcı bulunamadı. Lütfen tekrar giriş yapın.');
@@ -102,13 +116,16 @@ export default function VerificationScreen() {
         rank: selectedRank,
         mainAgents: mainRoles,
         profilePicBase64: profilePicBase64 || null,
+        verificationStatus: 'pending',
+        rankProofImageUrl: verificationPicBase64,
+        rankSubmitted: selectedRank
       });
       
-      showAlert('Başarılı', 'Profiliniz güncellendi!');
+      showAlert('Başarılı', 'Profiliniz ve rütbe kanıtınız başarıyla gönderildi! Lobi kurabilmek ve katılabilmek için admin onayını bekleyiniz.');
       router.replace('/(tabs)');
-    } catch (error) {
-      console.error(error);
-      showAlert('Hata', 'Bilgiler kaydedilirken bir hata oluştu.');
+    } catch (error: any) {
+      console.error('Submit Error:', error);
+      showAlert('Hata', error.message || 'Bilgiler kaydedilirken bir hata oluştu.');
     } finally {
       setLoading(false);
     }

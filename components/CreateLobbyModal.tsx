@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { PrimaryButton } from './PrimaryButton';
 import { VALORANT_RANKS, RankType } from '@/constants/ranks';
 import { auth, db } from '@/firebaseConfig';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 
 // Order matters: index 0 = lowest, 8 = highest
 const RANK_KEYS: RankType[] = [
@@ -87,6 +87,22 @@ export const CreateLobbyModal = ({ isVisible, onClose }: CreateLobbyModalProps) 
 
     setPublishing(true);
     try {
+      // Check user verificationStatus
+      const userSnap = await getDoc(doc(db, 'users', user.uid));
+      if (userSnap.exists()) {
+        const uData = userSnap.data();
+        if (uData.verificationStatus !== 'verified') {
+          setPublishing(false);
+          const alertMsg = "Lobi kurmak için hesabınızın admin tarafından onaylanması gerekmektedir.";
+          if (Platform.OS === 'web') {
+            window.alert(alertMsg);
+          } else {
+            Alert.alert("Hata", alertMsg);
+          }
+          return;
+        }
+      }
+
       await addDoc(collection(db, 'lobbies'), {
         creatorId: user.uid,
         gameMode,

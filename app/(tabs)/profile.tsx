@@ -1,44 +1,167 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, SafeAreaView, Platform, useWindowDimensions, ActivityIndicator, TouchableOpacity } from 'react-native';
-import { useRouter } from 'expo-router';
+import { View, Text, StyleSheet, ScrollView, Image, SafeAreaView, Platform, useWindowDimensions, ActivityIndicator, TouchableOpacity, FlatList } from 'react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Colors } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { VALORANT_RANKS } from '@/constants/ranks';
 import { auth, db } from '@/firebaseConfig';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, collection, query, where, getDocs, getDoc, updateDoc } from 'firebase/firestore';
 import { EditProfileModal } from '@/components/EditProfileModal';
 import { PrimaryButton } from '@/components/PrimaryButton';
+
+interface ReviewItem {
+  id: string;
+  rating: number;
+  note: string;
+  timestamp: any;
+  reviewerId: string;
+  reviewerName: string;
+  reviewerPhoto: string | null;
+}
 
 export default function ProfileScreen() {
   const { width } = useWindowDimensions();
   const isWeb = Platform.OS === 'web' && width >= 768;
   const router = useRouter();
+  const { targetUserId } = useLocalSearchParams<{ targetUserId?: string }>();
+
+  // Determine if viewing own profile
+  const isOwnProfile = !targetUserId || targetUserId === auth.currentUser?.uid;
+  const displayUserId = isOwnProfile ? auth.currentUser?.uid : targetUserId;
 
   const [userData, setUserData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
 
+  // Reviews states
+  const [reviews, setReviews] = useState<ReviewItem[]>([]);
+  const [loadingReviews, setLoadingReviews] = useState(false);
+  const [calculatedAverage, setCalculatedAverage] = useState<number | null>(null);
+
+
+
+  // 1. Listen for user document changes
   useEffect(() => {
-    const unsubscribeAuth = auth.onAuthStateChanged((user) => {
-      if (user) {
-        const unsubDoc = onSnapshot(doc(db, 'users', user.uid), (doc) => {
-          if (doc.exists()) {
-            setUserData(doc.data());
-          }
-          setLoading(false);
-        }, (error) => {
-          console.error("Snapshot error:", error);
-          setLoading(false);
-        });
-        return () => unsubDoc();
-      } else {
-        setUserData(null);
-        setLoading(false);
+    if (!displayUserId) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    const unsubDoc = onSnapshot(doc(db, 'users', displayUserId), (docSnap) => {
+      if (docSnap.exists()) {
+        setUserData(docSnap.data());
       }
+      setLoading(false);
+    }, (error) => {
+      console.error("Snapshot error:", error);
+      setLoading(false);
     });
 
-    return () => unsubscribeAuth();
-  }, []);
+    return () => unsubDoc();
+  }, [displayUserId]);
+
+  // 2. Fetch match_history reviews for target user
+  useEffect(() => {
+    if (!displayUserId) return;
+
+    const fetchReviews = async () => {
+      setLoadingReviews(true);
+      try {
+        // Query 1: Target user is player, leader gave rating
+        const q1 = query(
+          collection(db, 'match_history'),
+          where('playerId', '==', displayUserId),
+          where('leaderRated', '==', true)
+        );
+
+        // Query 2: Target user is leader, player gave rating
+        const q2 = query(
+          collection(db, 'match_history'),
+          where('leaderId', '==', displayUserId),
+          where('playerRated', '==', true)
+        );
+
+        const [snap1, snap2] = await Promise.all([getDocs(q1), getDocs(q2)]);
+
+        const rawReviews: any[] = [];
+        
+        snap1.forEach((dSnap) => {
+          const data = dSnap.data();
+          if (data && data.leaderRating !== undefined && data.leaderRating !== null) {
+            rawReviews.push({
+              id: dSnap.id,
+              rating: Number(data.leaderRating),
+              note: data.leaderNote || '',
+              timestamp: data.timestamp,
+              reviewerId: data.leaderId
+            });
+          }
+        });
+
+        snap2.forEach((dSnap) => {
+          const data = dSnap.data();
+          if (data && data.playerRating !== undefined && data.playerRating !== null) {
+            rawReviews.push({
+              id: dSnap.id,
+              rating: Number(data.playerRating),
+              note: data.playerNote || '',
+              timestamp: data.timestamp,
+              reviewerId: data.playerId
+            });
+          }
+        });
+
+        // Sort by timestamp descending
+        rawReviews.sort((a, b) => {
+          const tA = a.timestamp?.toMillis() || 0;
+          const tB = b.timestamp?.toMillis() || 0;
+          return tB - tA;
+        });
+
+        // Enrich reviewer names and photos
+        const enrichedReviewsPromises = rawReviews.map(async (rev) => {
+          let reviewerName = 'Bilinmeyen Oyuncu';
+          let reviewerPhoto = null;
+
+          try {
+            const revSnap = await getDoc(doc(db, 'users', rev.reviewerId));
+            if (revSnap.exists()) {
+              const rData = revSnap.data();
+              reviewerName = rData.username || 'Bilinmeyen Oyuncu';
+              reviewerPhoto = rData.profilePicBase64 || null;
+            }
+          } catch (err) {
+            console.warn('Error fetching reviewer data:', err);
+          }
+
+          return {
+            ...rev,
+            reviewerName,
+            reviewerPhoto
+          };
+        });
+
+        const enrichedReviews = await Promise.all(enrichedReviewsPromises);
+        setReviews(enrichedReviews);
+
+        // Calculate actual average rating
+        if (enrichedReviews.length > 0) {
+          const total = enrichedReviews.reduce((sum, r) => sum + r.rating, 0);
+          setCalculatedAverage(parseFloat((total / enrichedReviews.length).toFixed(1)));
+        } else {
+          setCalculatedAverage(null);
+        }
+
+      } catch (err) {
+        console.error('Error fetching player reviews:', err);
+      } finally {
+        setLoadingReviews(false);
+      }
+    };
+
+    fetchReviews();
+  }, [displayUserId]);
 
   if (loading) {
     return (
@@ -51,13 +174,41 @@ export default function ProfileScreen() {
   if (!userData) {
     return (
       <View style={[styles.safeArea, { justifyContent: 'center', alignItems: 'center' }]}>
-        <Text style={{ color: Colors.text }}>Giriş yapılmış bir hesap bulunamadı.</Text>
+        <Text style={{ color: Colors.text }}>Oyuncu profili bulunamadı.</Text>
       </View>
     );
   }
 
+  // Generate stars JSX helper
+  const renderStarIcons = (score: number) => {
+    const stars = [];
+    const rounded = Math.round(score);
+    for (let i = 1; i <= 5; i++) {
+      stars.push(
+        <Ionicons 
+          key={i} 
+          name={i <= rounded ? "star" : "star-outline"} 
+          size={16} 
+          color={i <= rounded ? "#FFD700" : Colors.gray} 
+        />
+      );
+    }
+    return stars;
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
+      
+      {/* Back button header (only if viewing someone else's profile) */}
+      {!isOwnProfile && (
+        <View style={styles.topHeader}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color={Colors.text} />
+            <Text style={styles.backText}>Geri Dön</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       <ScrollView 
         style={styles.container} 
         contentContainerStyle={[styles.contentPadding, isWeb && styles.webContentPadding]}
@@ -80,15 +231,49 @@ export default function ProfileScreen() {
           
           <Text style={styles.riotId}>{userData.riotId || userData.username}</Text>
           
+          {/* Rating display: Prominently show star rating with click details */}
           <View style={styles.ratingRow}>
-            <Ionicons name="star" size={16} color="#FFD700" />
-            <Text style={styles.ratingText}>{userData.rating || '0.0'} / 5.0</Text>
+            {calculatedAverage !== null ? (
+              <>
+                <View style={styles.starRow}>
+                  {renderStarIcons(calculatedAverage)}
+                </View>
+                <Text style={styles.ratingText}>
+                  {calculatedAverage} ({reviews.length} Değerlendirme)
+                </Text>
+              </>
+            ) : (
+              <>
+                <Ionicons name="star" size={16} color="#FFD700" />
+                <Text style={styles.ratingText}>
+                  {userData.rating || '0.0'} / 5.0 (Oylanmadı)
+                </Text>
+              </>
+            )}
+          </View>
+
+          {/* User statistics details */}
+          <View style={styles.statsContainer}>
+            <View style={styles.statBox}>
+              <Text style={styles.statNumber}>{userData.lobbiesCreated || 0}</Text>
+              <Text style={styles.statLabel}>Açılan Lobi</Text>
+            </View>
+            <View style={styles.statsDivider} />
+            <View style={styles.statBox}>
+              <Text style={styles.statNumber}>{userData.lobbiesJoined || 0}</Text>
+              <Text style={styles.statLabel}>Katılınan Lobi</Text>
+            </View>
           </View>
 
           <View style={styles.rankAgentRow}>
             {userData.rank && VALORANT_RANKS[userData.rank as keyof typeof VALORANT_RANKS] ? (
               <View style={styles.rankBox}>
-                <Image source={VALORANT_RANKS[userData.rank as keyof typeof VALORANT_RANKS].icon} style={styles.rankIcon} />
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Image source={VALORANT_RANKS[userData.rank as keyof typeof VALORANT_RANKS].icon} style={styles.rankIcon} />
+                  {userData.verificationStatus === 'verified' && (
+                    <Ionicons name="checkmark-circle" size={16} color="#00FF87" />
+                  )}
+                </View>
                 <Text style={styles.rankName}>{VALORANT_RANKS[userData.rank as keyof typeof VALORANT_RANKS].name}</Text>
               </View>
             ) : (
@@ -111,25 +296,108 @@ export default function ProfileScreen() {
             </View>
           </View>
 
+          {/* Rank Verification Status Row */}
+          {isOwnProfile && userData?.verificationStatus && (
+            <View style={styles.verificationContainer}>
+              {userData.verificationStatus === 'pending' ? (
+                <View style={styles.pendingBadge}>
+                  <Ionicons name="time" size={16} color="#FFB300" />
+                  <Text style={styles.pendingText}>Rütbe onayınız beklemede...</Text>
+                </View>
+              ) : userData.verificationStatus === 'verified' ? (
+                <View style={styles.verifiedBadge}>
+                  <Ionicons name="checkmark-circle" size={16} color="#00FF87" />
+                  <Text style={styles.verifiedText}>Rütbeniz Doğrulandı</Text>
+                </View>
+              ) : userData.verificationStatus === 'rejected' ? (
+                <View style={[styles.pendingBadge, { backgroundColor: 'rgba(255, 70, 85, 0.1)', borderColor: 'rgba(255, 70, 85, 0.2)' }]}>
+                  <Ionicons name="close-circle" size={16} color={Colors.danger} />
+                  <Text style={[styles.pendingText, { color: Colors.danger }]}>Rütbe onayınız reddedildi.</Text>
+                </View>
+              ) : null}
+            </View>
+          )}
+
           <View style={styles.bioBox}>
             <Text style={styles.bioText}>{userData.bio || 'Henüz bir biyografi eklenmemiş.'}</Text>
           </View>
 
-          <View style={{ height: 24 }} />
+          {/* Action buttons (only shown for owner profile) */}
+          {isOwnProfile && (
+            <>
+              <View style={{ height: 24 }} />
+              <PrimaryButton 
+                title="Profili Düzenle" 
+                onPress={() => setIsEditModalVisible(true)} 
+              />
 
-          <PrimaryButton 
-            title="Profili Düzenle" 
-            onPress={() => setIsEditModalVisible(true)} 
-          />
+              <TouchableOpacity 
+                style={styles.historyBtn} 
+                onPress={() => router.push('/previous-players')}
+              >
+                <Ionicons name="time-outline" size={20} color={Colors.primary} />
+                <Text style={styles.historyBtnText}>Geçmiş Karşılaşmalar</Text>
+              </TouchableOpacity>
 
-          {userData.role === 'admin' && (
-            <TouchableOpacity 
-              style={styles.adminBtn} 
-              onPress={() => router.push('/admin')}
-            >
-              <Ionicons name="shield-half" size={20} color={Colors.primary} />
-              <Text style={styles.adminBtnText}>Yönetim Paneli</Text>
-            </TouchableOpacity>
+              {userData.role === 'admin' && (
+                <TouchableOpacity 
+                  style={styles.adminBtn} 
+                  onPress={() => router.push('/admin')}
+                >
+                  <Ionicons name="shield-half" size={20} color={Colors.primary} />
+                  <Text style={styles.adminBtnText}>Yönetim Paneli</Text>
+                </TouchableOpacity>
+              )}
+            </>
+          )}
+        </View>
+
+        {/* Teammate reviews list: Oyuncu Yorumları */}
+        <View style={styles.reviewsSection}>
+          <Text style={styles.reviewsTitle}>Oyuncu Yorumları ({reviews.length})</Text>
+
+          {loadingReviews ? (
+            <ActivityIndicator size="small" color={Colors.primary} style={{ marginTop: 20 }} />
+          ) : reviews.length === 0 ? (
+            <View style={styles.emptyReviews}>
+              <Ionicons name="chatbox-ellipses-outline" size={32} color={Colors.gray} />
+              <Text style={styles.emptyReviewsText}>Bu oyuncu hakkında henüz yazılı bir yorum yapılmamış.</Text>
+            </View>
+          ) : (
+            reviews.map((item) => {
+              const dateStr = item.timestamp?.toDate()
+                ? item.timestamp.toDate().toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                : 'Bilinmiyor';
+
+              return (
+                <View key={item.id} style={styles.reviewCard}>
+                  <View style={styles.reviewHeader}>
+                    <View style={styles.reviewerInfo}>
+                      <View style={styles.reviewerAvatarWrapper}>
+                        {item.reviewerPhoto ? (
+                          <Image 
+                            source={{ uri: `data:image/jpeg;base64,${item.reviewerPhoto}` }} 
+                            style={styles.reviewerAvatar} 
+                          />
+                        ) : (
+                          <Ionicons name="person" size={14} color={Colors.gray} />
+                        )}
+                      </View>
+                      <Text style={styles.reviewerName}>{item.reviewerName}</Text>
+                    </View>
+                    <Text style={styles.reviewDate}>{dateStr}</Text>
+                  </View>
+
+                  <View style={styles.reviewRatingRow}>
+                    {renderStarIcons(item.rating)}
+                  </View>
+
+                  <Text style={styles.reviewNote}>
+                    {item.note.trim() || `${item.rating} Yıldızlı Değerlendirme`}
+                  </Text>
+                </View>
+              );
+            })
           )}
         </View>
 
@@ -139,7 +407,7 @@ export default function ProfileScreen() {
           userData={userData}
         />
 
-        <View style={{ height: 40 }} />
+        <View style={{ height: 60 }} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -149,6 +417,23 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: Colors.background,
+  },
+  topHeader: {
+    height: 50,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  backText: {
+    color: Colors.text,
+    fontSize: 14,
+    fontWeight: '700',
   },
   container: {
     flex: 1,
@@ -165,7 +450,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 24,
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.02)',
   },
   avatarContainer: {
     position: 'relative',
@@ -187,25 +474,6 @@ const styles = StyleSheet.create({
     height: '100%',
     resizeMode: 'cover',
   },
-  editBadge: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    backgroundColor: Colors.primary,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: Colors.surface,
-  },
-  uploadOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   riotId: {
     color: Colors.text,
     fontSize: 24,
@@ -215,13 +483,51 @@ const styles = StyleSheet.create({
   ratingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 20,
+    gap: 10,
+    marginBottom: 16,
+  },
+  starRow: {
+    flexDirection: 'row',
+    gap: 3,
   },
   ratingText: {
     color: Colors.gray,
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0F1923',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    marginBottom: 20,
+    width: '100%',
+    maxWidth: 300,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  statBox: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statNumber: {
+    color: Colors.primary,
+    fontSize: 20,
+    fontWeight: '900',
+    marginBottom: 2,
+  },
+  statLabel: {
+    color: Colors.gray,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  statsDivider: {
+    width: 1,
+    height: 30,
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
   rankAgentRow: {
     flexDirection: 'row',
@@ -280,6 +586,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     marginTop: 16,
+    width: '100%',
     padding: 12,
     borderWidth: 1,
     borderColor: Colors.primary,
@@ -290,5 +597,162 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     fontSize: 14,
     fontWeight: '700',
+  },
+  historyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 16,
+    width: '100%',
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+  },
+  historyBtnText: {
+    color: Colors.text,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  reviewsSection: {
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.02)',
+  },
+  reviewsTitle: {
+    color: Colors.text,
+    fontSize: 16,
+    fontWeight: '900',
+    marginBottom: 16,
+    letterSpacing: 0.5,
+  },
+  emptyReviews: {
+    alignItems: 'center',
+    paddingVertical: 32,
+    gap: 8,
+  },
+  emptyReviewsText: {
+    color: Colors.gray,
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 18,
+    paddingHorizontal: 20,
+  },
+  reviewCard: {
+    backgroundColor: '#0F1923',
+    borderRadius: 8,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.04)',
+  },
+  reviewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  reviewerInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  reviewerAvatarWrapper: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  reviewerAvatar: {
+    width: '100%',
+    height: '100%',
+  },
+  reviewerName: {
+    color: Colors.text,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  reviewDate: {
+    color: Colors.gray,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  reviewRatingRow: {
+    flexDirection: 'row',
+    gap: 3,
+    marginBottom: 8,
+  },
+  reviewNote: {
+    color: Colors.gray,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  verificationContainer: {
+    width: '100%',
+    alignItems: 'center',
+    marginVertical: 12,
+  },
+  verificationBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    borderRadius: 8,
+    backgroundColor: 'rgba(0, 255, 135, 0.05)',
+  },
+  verificationBtnText: {
+    color: Colors.primary,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  pendingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255, 179, 0, 0.1)',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 179, 0, 0.2)',
+  },
+  pendingText: {
+    color: '#FFB300',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  verifiedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(0, 255, 135, 0.1)',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 135, 0.2)',
+  },
+  verifiedText: {
+    color: '#00FF87',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  rejectedSubText: {
+    color: Colors.danger,
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 6,
+    textAlign: 'center',
   },
 });

@@ -164,7 +164,7 @@ export const ReportModal = ({ visible, onClose, reportedUserId }: ReportModalPro
                 onChangeText={setExplanation}
                 multiline
                 numberOfLines={3}
-                disabled={submitting}
+                editable={!submitting}
               />
 
               <TouchableOpacity 

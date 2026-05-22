@@ -1,4 +1,4 @@
-import { Tabs } from 'expo-router';
+import { Tabs, router } from 'expo-router';
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Platform, useWindowDimensions, Text, TouchableOpacity, SafeAreaView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -6,6 +6,7 @@ import { Colors } from '@/constants/theme';
 import { TopNavBar } from '@/components/TopNavBar';
 import { NotificationsModal } from '@/components/NotificationsModal';
 import { CreateLobbyModal } from '@/components/CreateLobbyModal';
+import { PlayerVerificationToast } from '@/components/PlayerVerificationToast';
 import { auth, db } from '@/firebaseConfig';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 
@@ -106,6 +107,13 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
+          name="forum"
+          options={{
+            title: 'Forum',
+            tabBarIcon: ({ color }) => <Ionicons size={24} name="chatbubbles-outline" color={color} />,
+          }}
+        />
+        <Tabs.Screen
           name="create"
           options={{
             title: 'Lobi Kur',
@@ -124,16 +132,17 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
+          name="report"
+          options={{
+            title: 'Rapor Et',
+            tabBarIcon: ({ color }) => <Ionicons size={24} name="flag-outline" color={color} />,
+          }}
+        />
+        <Tabs.Screen
           name="profile"
           options={{
             title: 'Profil',
             tabBarIcon: ({ color }) => <Ionicons size={24} name="person" color={color} />,
-          }}
-        />
-        <Tabs.Screen
-          name="report"
-          options={{
-            href: null,
           }}
         />
       </Tabs>
@@ -147,6 +156,8 @@ export default function TabLayout() {
         isVisible={isLobbyModalOpen} 
         onClose={() => setIsLobbyModalOpen(false)} 
       />
+
+      <PlayerVerificationToast />
     </View>
   );
 }

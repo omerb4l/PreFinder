@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { auth, db } from '@/firebaseConfig';
 import { collection, query, where, onSnapshot, doc, updateDoc, getDoc } from 'firebase/firestore';
+import { useRouter } from 'expo-router';
 
 import { VALORANT_RANKS, RankType } from '@/constants/ranks';
 import { Image } from 'react-native';
@@ -26,9 +27,11 @@ interface AppNotification {
   requesterName?: string;
   requesterPhoto?: string;
   requesterRank?: RankType;
+  requesterVerified?: boolean;
 }
 
 export const NotificationsModal = ({ isVisible, onClose }: NotificationsModalProps) => {
+  const router = useRouter();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -57,6 +60,7 @@ export const NotificationsModal = ({ isVisible, onClose }: NotificationsModalPro
           let requesterName = 'Bilinmeyen';
           let requesterPhoto = null;
           let requesterRank: RankType = 'platinum';
+          let requesterVerified = false;
           
           try {
             const userRef = doc(db, 'users', data.requesterId);
@@ -66,6 +70,7 @@ export const NotificationsModal = ({ isVisible, onClose }: NotificationsModalPro
               requesterName = uData.username || 'Bilinmeyen';
               requesterPhoto = uData.profilePicBase64 || null;
               requesterRank = uData.rank || 'platinum';
+              requesterVerified = uData.verificationStatus === 'verified';
             }
           } catch (err) {
             console.warn(`Could not fetch data for requester ${data.requesterId}:`, err);
@@ -77,7 +82,8 @@ export const NotificationsModal = ({ isVisible, onClose }: NotificationsModalPro
             ...data,
             requesterName,
             requesterPhoto,
-            requesterRank
+            requesterRank,
+            requesterVerified
           } as AppNotification;
         });
 
@@ -219,7 +225,13 @@ export const NotificationsModal = ({ isVisible, onClose }: NotificationsModalPro
                         </View>
                         
                         <View style={styles.requesterCard}>
-                          <View style={styles.requesterInfo}>
+                          <TouchableOpacity 
+                            style={styles.requesterInfo}
+                            onPress={() => {
+                              onClose();
+                              router.push({ pathname: '/profile', params: { targetUserId: notif.requesterId } });
+                            }}
+                          >
                             {notif.requesterPhoto ? (
                               <Image 
                                 source={{ uri: `data:image/jpeg;base64,${notif.requesterPhoto}` }} 
@@ -242,9 +254,12 @@ export const NotificationsModal = ({ isVisible, onClose }: NotificationsModalPro
                                 <Text style={styles.rankTextSmall}>
                                   {notif.requesterRank ? VALORANT_RANKS[notif.requesterRank].name : 'Belirsiz'}
                                 </Text>
+                                {notif.requesterVerified && (
+                                  <Ionicons name="checkmark-circle" size={12} color="#00FF87" style={{ marginLeft: 4 }} />
+                                )}
                               </View>
                             </View>
-                          </View>
+                          </TouchableOpacity>
                         </View>
 
                         <Text style={styles.notifText}>Bu oyuncu lobinize katılmak istiyor.</Text>

@@ -40,10 +40,16 @@ export default function LoginScreen() {
         return;
       }
 
-      // Check for rank completion in Firestore
+      // Check for rank completion and ban status in Firestore
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (userDoc.exists()) {
         const data = userDoc.data();
+        if (data.isBanned === true) {
+          await signOut(auth);
+          setErrorMsg('Hesabınız kuralları ihlal ettiği için kalıcı olarak yasaklanmıştır.');
+          setLoading(false);
+          return;
+        }
         if (data.rank) {
           router.replace('/(tabs)');
         } else {

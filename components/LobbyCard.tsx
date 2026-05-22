@@ -6,6 +6,7 @@ import { VALORANT_RANKS, RankType } from '@/constants/ranks';
 import { auth, db } from '@/firebaseConfig';
 import { collection, addDoc, serverTimestamp, doc, getDoc, deleteDoc, query, where, getDocs, writeBatch, onSnapshot } from 'firebase/firestore';
 import { ReportModal } from '@/components/ReportModal';
+import { useRouter } from 'expo-router';
 
 interface LobbyCardProps {
   lobbyId: string;
@@ -32,6 +33,7 @@ export const LobbyCard = ({
   rating,
   avatarUrl
 }: LobbyCardProps) => {
+  const router = useRouter();
   const { width } = useWindowDimensions();
   const isWeb = Platform.OS === 'web' && width >= 768;
   const [requestId, setRequestId] = useState<string | null>(null);
@@ -110,6 +112,22 @@ export const LobbyCard = ({
 
     setIsRequesting(true);
     try {
+      // Check user verificationStatus
+      const userSnap = await getDoc(doc(db, 'users', currentUser.uid));
+      if (userSnap.exists()) {
+        const uData = userSnap.data();
+        if (uData.verificationStatus !== 'verified') {
+          setIsRequesting(false);
+          const alertMsg = "Lobilere katılmak için hesabınızın admin tarafından onaylanması gerekmektedir.";
+          if (Platform.OS === 'web') {
+            window.alert(alertMsg);
+          } else {
+            Alert.alert("Hata", alertMsg);
+          }
+          return;
+        }
+      }
+
       await addDoc(collection(db, 'requests'), {
         lobbyId,
         requesterId: currentUser.uid,
@@ -263,7 +281,12 @@ export const LobbyCard = ({
   if (isWeb) {
     return (
       <View style={styles.webCard}>
-        <View style={styles.webLeft}>
+        <TouchableOpacity 
+          style={styles.webLeft}
+          onPress={() => {
+            router.push({ pathname: '/profile', params: { targetUserId: creatorId } });
+          }}
+        >
           <View style={styles.avatarPlaceholderSmall}>
             {creatorPhoto ? (
               <Image
@@ -278,7 +301,7 @@ export const LobbyCard = ({
             <Text style={styles.webIdText}>{creatorName}</Text>
             <Text style={styles.webRatingText}>⭐ {rating}</Text>
           </View>
-        </View>
+        </TouchableOpacity>
 
         <View style={styles.webCenterLeft}>
           <View style={styles.row}>
@@ -316,7 +339,12 @@ export const LobbyCard = ({
           </TouchableOpacity>
         )}
 
-        <View style={styles.leftSection}>
+        <TouchableOpacity 
+          style={styles.leftSection}
+          onPress={() => {
+            router.push({ pathname: '/profile', params: { targetUserId: creatorId } });
+          }}
+        >
           <View style={styles.avatarPlaceholder}>
             {creatorPhoto ? (
               <Image
@@ -330,10 +358,16 @@ export const LobbyCard = ({
           <View style={styles.ratingBadge}>
             <Text style={styles.ratingText}>⭐ {rating}</Text>
           </View>
-        </View>
+        </TouchableOpacity>
 
         <View style={styles.middleSection}>
-          <Text style={styles.mobileNameText}>{creatorName}</Text>
+          <TouchableOpacity 
+            onPress={() => {
+              router.push({ pathname: '/profile', params: { targetUserId: creatorId } });
+            }}
+          >
+            <Text style={styles.mobileNameText}>{creatorName}</Text>
+          </TouchableOpacity>
           <View style={styles.mobileModeBadge}>
             <Text style={styles.mobileModeText}>{gameMode}</Text>
           </View>
