@@ -1,9 +1,10 @@
-import React, { useEffect } from 'react';
-import { DarkTheme, ThemeProvider } from '@react-navigation/native';
+import React, { useEffect, useState } from 'react';
+import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Alert, Platform } from 'react-native';
 import 'react-native-reanimated';
+import { Colors, getThemeMode, subscribeTheme } from '@/constants/theme';
 
 import { auth, db } from '@/firebaseConfig';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
@@ -14,6 +15,14 @@ export const unstable_settings = {
 };
 
 export default function RootLayout() {
+  const [themeMode, setThemeMode] = useState(getThemeMode());
+
+  useEffect(() => {
+    const unsubscribe = subscribeTheme((newTheme) => {
+      setThemeMode(newTheme);
+    });
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     let unsubUserDoc: (() => void) | undefined;
@@ -63,15 +72,25 @@ export default function RootLayout() {
     };
   }, []);
 
+  const navTheme = {
+    ...(themeMode === 'light' ? DefaultTheme : DarkTheme),
+    colors: {
+      ...(themeMode === 'light' ? DefaultTheme.colors : DarkTheme.colors),
+      background: Colors.background,
+      card: Colors.surface,
+      text: Colors.text,
+    }
+  };
+
   return (
-    <ThemeProvider value={DarkTheme}>
+    <ThemeProvider value={navTheme}>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="admin" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>
-      <StatusBar style="light" />
+      <StatusBar style={themeMode === 'light' ? 'dark' : 'light'} />
     </ThemeProvider>
   );
 }

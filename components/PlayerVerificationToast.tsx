@@ -138,13 +138,13 @@ const styles = StyleSheet.create({
   },
   webWrapper: {
     bottom: 24,
-    right: 24,
+    left: 24,
     width: 320,
   },
   mobileWrapper: {
     bottom: Platform.OS === 'ios' ? 95 : 75,
     left: 16,
-    right: 16,
+    width: 280,
   },
   container: {
     backgroundColor: '#1F2326',

@@ -30,6 +30,36 @@ export const Colors = {
   },
 };
 
+let currentTheme: 'dark' | 'light' = 'dark';
+const listeners = new Set<(theme: 'dark' | 'light') => void>();
+
+export const getThemeMode = () => currentTheme;
+
+export const subscribeTheme = (listener: (theme: 'dark' | 'light') => void) => {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+};
+
+export const toggleTheme = () => {
+  currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+  if (currentTheme === 'light') {
+    Colors.background = '#ECE8E1'; // Light off-white sand background
+    Colors.surface = '#F5F2EC';    // Lighter card/surface
+    Colors.text = '#0F1923';       // Dark text
+    Colors.gray = '#6A7680';       // Darker gray for readability
+    Colors.primary = '#FF4655';    // Valorant Red for light mode
+  } else {
+    Colors.background = '#0F1923'; // Dark background
+    Colors.surface = '#1F2326';    // Dark surface
+    Colors.text = '#ECE8E1';       // Light text
+    Colors.gray = '#8B97A3';       // Light gray
+    Colors.primary = '#00FF87';    // Valorant Neon Green
+  }
+  listeners.forEach(l => l(currentTheme));
+};
+
 export const Fonts = Platform.select({
   ios: {
     /** iOS `UIFontDescriptorSystemDesignDefault` */

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform, useWindowDimensions, Image } from 'react-native';
-import { Colors } from '@/constants/theme';
+import { Colors, getThemeMode, subscribeTheme, toggleTheme } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, usePathname } from 'expo-router';
 import { auth, db } from '@/firebaseConfig';
@@ -18,6 +18,14 @@ export const TopNavBar = ({ onOpenNotifications, hasUnread = false }: TopNavBarP
   const isWeb = Platform.OS === 'web' && width >= 768;
 
   const [profilePic, setProfilePic] = useState<string | null>(null);
+  const [themeMode, setThemeMode] = useState(getThemeMode());
+
+  useEffect(() => {
+    const unsubTheme = subscribeTheme((newTheme) => {
+      setThemeMode(newTheme);
+    });
+    return () => unsubTheme();
+  }, []);
 
   useEffect(() => {
     const unsubscribeAuth = auth.onAuthStateChanged((user: any) => {
@@ -78,6 +86,17 @@ export const TopNavBar = ({ onOpenNotifications, hasUnread = false }: TopNavBarP
       )}
 
       <View style={styles.navRight}>
+        <TouchableOpacity 
+          style={styles.iconButton}
+          onPress={toggleTheme}
+        >
+          <Ionicons 
+            name={themeMode === 'light' ? "moon-outline" : "sunny-outline"} 
+            size={22} 
+            color={Colors.text} 
+          />
+        </TouchableOpacity>
+        
         <TouchableOpacity 
           style={styles.iconButton}
           onPress={onOpenNotifications}
