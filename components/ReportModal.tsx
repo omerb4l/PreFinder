@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#0F1923',
+    borderBottomColor: Colors.background,
     paddingBottom: 12,
   },
   headerTitleRow: {
@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   infoBox: {
-    backgroundColor: '#0F1923',
+    backgroundColor: Colors.background,
     borderRadius: 8,
     padding: 12,
     marginBottom: 16,
@@ -261,7 +261,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   reasonBadge: {
-    backgroundColor: '#0F1923',
+    backgroundColor: Colors.background,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 16,
@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   input: {
-    backgroundColor: '#0F1923',
+    backgroundColor: Colors.background,
     color: Colors.text,
     padding: 12,
     borderRadius: 8,

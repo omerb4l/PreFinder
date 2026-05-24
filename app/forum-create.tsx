@@ -283,7 +283,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   categoryBadge: {
-    backgroundColor: '#0F1923',
+    backgroundColor: Colors.background,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   categoryBadgeTextActive: {
-    color: '#0F1923',
+    color: Colors.background,
   },
   imagePickerBtn: {
     backgroundColor: 'rgba(0, 255, 135, 0.05)',
@@ -346,7 +346,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   submitBtnText: {
-    color: '#0F1923',
+    color: Colors.background,
     fontSize: 16,
     fontWeight: '900',
   },

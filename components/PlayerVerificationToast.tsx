@@ -194,7 +194,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
   },
   yesBtnText: {
-    color: '#0F1923',
+    color: Colors.background,
     fontSize: 13,
     fontWeight: '800',
   },

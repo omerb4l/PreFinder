@@ -51,7 +51,7 @@ export const toggleTheme = () => {
       root.style.setProperty('--surface', '#F5F2EC');
       root.style.setProperty('--text', '#0F1923');
       root.style.setProperty('--gray', '#6A7680');
-      root.style.setProperty('--primary', '#FF4655');
+      root.style.setProperty('--primary', '#008A47');
     } else {
       root.style.setProperty('--background', '#0F1923');
       root.style.setProperty('--surface', '#1F2326');
@@ -65,7 +65,7 @@ export const toggleTheme = () => {
       Colors.surface = '#F5F2EC';    // Lighter card/surface
       Colors.text = '#0F1923';       // Dark text
       Colors.gray = '#6A7680';       // Darker gray for readability
-      Colors.primary = '#FF4655';    // Valorant Red for light mode
+      Colors.primary = '#008A47';    // Valorant Green for light mode
     } else {
       Colors.background = '#0F1923'; // Dark background
       Colors.surface = '#1F2326';    // Dark surface

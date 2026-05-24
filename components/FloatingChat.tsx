@@ -268,7 +268,7 @@ export const FloatingChat = () => {
             setHasNewMessage(false);
           }}
         >
-          <Ionicons name="chatbubbles" size={24} color="#0F1923" />
+          <Ionicons name="chatbubbles" size={24} color={Colors.background} />
           <Text style={styles.bubbleText}>Lobi DM</Text>
           {hasNewMessage && <View style={styles.badgeDot} />}
         </TouchableOpacity>
@@ -415,7 +415,7 @@ export const FloatingChat = () => {
                     style={styles.sendBtn}
                     onPress={handleSend}
                   >
-                    <Ionicons name="send" size={16} color="#0F1923" />
+                    <Ionicons name="send" size={16} color={Colors.background} />
                   </TouchableOpacity>
                 </View>
               </>
@@ -466,7 +466,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   bubbleText: {
-    color: '#0F1923',
+    color: Colors.background,
     fontWeight: '900',
     fontSize: 13,
     textTransform: 'uppercase',
@@ -481,7 +481,7 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: Colors.danger,
     borderWidth: 1.5,
-    borderColor: '#0F1923',
+    borderColor: Colors.background,
   },
   chatBox: {
     backgroundColor: Colors.surface,
@@ -551,7 +551,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    backgroundColor: '#0F1923',
+    backgroundColor: Colors.background,
   },
   listScroll: {
     flex: 1,
@@ -652,7 +652,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.04)',
   },
   myBubbleText: {
-    color: '#0F1923',
+    color: Colors.background,
     fontSize: 13,
     fontWeight: '600',
   },
@@ -671,7 +671,7 @@ const styles = StyleSheet.create({
   },
   textInput: {
     flex: 1,
-    backgroundColor: '#0F1923',
+    backgroundColor: Colors.background,
     color: Colors.text,
     paddingHorizontal: 12,
     paddingVertical: 8,

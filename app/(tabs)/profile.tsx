@@ -722,7 +722,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0F1923',
+    backgroundColor: Colors.background,
     borderRadius: 8,
     paddingVertical: 12,
     paddingHorizontal: 20,
@@ -794,7 +794,7 @@ const styles = StyleSheet.create({
   bioBox: {
     width: '100%',
     padding: 16,
-    backgroundColor: 'rgba(15, 25, 35, 0.5)',
+    backgroundColor: Colors.background,
     borderRadius: 8,
   },
   bioText: {
@@ -866,7 +866,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   reviewCard: {
-    backgroundColor: '#0F1923',
+    backgroundColor: Colors.background,
     borderRadius: 8,
     padding: 14,
     marginBottom: 10,

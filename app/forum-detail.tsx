@@ -457,7 +457,7 @@ export default function PostDetailScreen() {
             onPress={handleSendComment}
             disabled={!newComment.trim()}
           >
-            <Ionicons name="send" size={18} color="#0F1923" />
+            <Ionicons name="send" size={18} color={Colors.background} />
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -519,7 +519,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#0F1923',
+    backgroundColor: Colors.background,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
@@ -542,7 +542,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   categoryLabel: {
-    backgroundColor: '#0F1923',
+    backgroundColor: Colors.background,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 4,
@@ -644,7 +644,7 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: '#0F1923',
+    backgroundColor: Colors.background,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,

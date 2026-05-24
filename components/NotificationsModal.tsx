@@ -344,7 +344,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#0F1923',
+    borderBottomColor: Colors.background,
     paddingBottom: 12,
   },
   title: {
@@ -383,7 +383,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   requesterCard: {
-    backgroundColor: '#0F1923',
+    backgroundColor: Colors.background,
     borderRadius: 8,
     padding: 10,
     marginVertical: 8,
@@ -464,7 +464,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
   },
   acceptBtnText: {
-    color: '#0F1923',
+    color: Colors.background,
     fontSize: 12,
     fontWeight: '700',
   },

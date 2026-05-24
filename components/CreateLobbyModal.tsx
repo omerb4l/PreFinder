@@ -258,7 +258,7 @@ export const CreateLobbyModal = ({ isVisible, onClose }: CreateLobbyModalProps) 
                       <Ionicons
                         name={role.icon as any}
                         size={14}
-                        color={selectedRoles.includes(role.id) ? '#0F1923' : Colors.gray}
+                        color={selectedRoles.includes(role.id) ? Colors.background : Colors.gray}
                       />
                       <Text style={[styles.roleBadgeText, selectedRoles.includes(role.id) && styles.roleBadgeTextActive]}>
                         {role.name}
@@ -396,7 +396,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 12,
     borderRadius: 8,
-    backgroundColor: '#0F1923',
+    backgroundColor: Colors.background,
     gap: 12,
     marginBottom: 6,
   },
@@ -438,7 +438,7 @@ const styles = StyleSheet.create({
     paddingRight: 20,
   },
   modeBadge: {
-    backgroundColor: '#0F1923',
+    backgroundColor: Colors.background,
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 8,
@@ -455,12 +455,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   modeBadgeTextActive: {
-    color: '#0F1923',
+    color: Colors.background,
   },
   counterRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0F1923',
+    backgroundColor: Colors.background,
     borderRadius: 8,
     alignSelf: 'flex-start',
     padding: 4,
@@ -485,7 +485,7 @@ const styles = StyleSheet.create({
   roleBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0F1923',
+    backgroundColor: Colors.background,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 6,
@@ -502,9 +502,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  roleBadgeTextActive: { color: '#0F1923' },
+  roleBadgeTextActive: { color: Colors.background },
   input: {
-    backgroundColor: '#0F1923',
+    backgroundColor: Colors.background,
     color: Colors.text,
     padding: 12,
     borderRadius: 8,
@@ -523,7 +523,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0F1923',
+    backgroundColor: Colors.background,
     padding: 10,
     borderRadius: 8,
     borderWidth: 1,

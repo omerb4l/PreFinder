@@ -17,7 +17,7 @@ export const PrimaryButton = ({ title, onPress, loading }: PrimaryButtonProps) =
       disabled={loading}
     >
       {loading ? (
-        <ActivityIndicator color="#0F1923" />
+        <ActivityIndicator color={Colors.background} />
       ) : (
         <Text style={styles.text}>{title}</Text>
       )}
@@ -36,7 +36,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   text: {
-    color: '#0F1923',
+    color: Colors.background,
     fontSize: 16,
     fontWeight: '700',
   },

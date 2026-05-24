@@ -395,7 +395,7 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
   },
   categoryBadge: {
-    backgroundColor: '#0F1923',
+    backgroundColor: Colors.background,
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
@@ -412,7 +412,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   categoryBadgeTextActive: {
-    color: '#0F1923',
+    color: Colors.background,
   },
   postsList: {
     gap: 16,
@@ -439,7 +439,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#0F1923',
+    backgroundColor: Colors.background,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
@@ -462,7 +462,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   categoryLabel: {
-    backgroundColor: '#0F1923',
+    backgroundColor: Colors.background,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 4,
@@ -559,7 +559,7 @@ const styles = StyleSheet.create({
     bottom: 30,
   },
   fabText: {
-    color: '#0F1923',
+    color: Colors.background,
     fontWeight: '800',
     fontSize: 14,
   },
