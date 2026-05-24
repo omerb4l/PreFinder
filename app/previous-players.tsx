@@ -6,6 +6,7 @@ import { Colors } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { auth, db } from '@/firebaseConfig';
 import { collection, query, where, getDocs, doc, getDoc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
 interface MatchHistoryItem {
   id: string;
@@ -286,14 +287,18 @@ export default function PreviousPlayersScreen() {
               <Text style={styles.emptyText}>Henüz doğrulanmış bir karşılaşma geçmişiniz yok.</Text>
             </View>
           ) : (
-            matches.map((item) => {
+            matches.map((item, index) => {
               const state = ratingStates[item.id] || { rating: 5, note: '', submitting: false };
               const matchDate = item.timestamp?.toDate() 
                 ? item.timestamp.toDate().toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) 
                 : 'Bilinmiyor';
 
               return (
-                <View key={item.id} style={styles.matchCard}>
+                <Animated.View
+                  key={item.id}
+                  entering={FadeInDown.duration(400).delay(Math.min(index * 80, 600))}
+                >
+                  <View style={styles.matchCard}>
                   
                   {/* Card Header: Teammate Profile Info */}
                   <View style={styles.cardHeader}>
@@ -376,7 +381,8 @@ export default function PreviousPlayersScreen() {
                     </View>
                   )}
 
-                </View>
+                  </View>
+                </Animated.View>
               );
             })
           )}

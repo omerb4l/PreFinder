@@ -1,6 +1,7 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { Colors } from '@/constants/theme';
+import { AnimatedTouchable } from './AnimatedTouchable';
 
 interface PrimaryButtonProps {
   title: string;
@@ -10,10 +11,9 @@ interface PrimaryButtonProps {
 
 export const PrimaryButton = ({ title, onPress, loading }: PrimaryButtonProps) => {
   return (
-    <TouchableOpacity 
+    <AnimatedTouchable 
       style={styles.button} 
       onPress={onPress} 
-      activeOpacity={0.8}
       disabled={loading}
     >
       {loading ? (
@@ -21,7 +21,7 @@ export const PrimaryButton = ({ title, onPress, loading }: PrimaryButtonProps) =
       ) : (
         <Text style={styles.text}>{title}</Text>
       )}
-    </TouchableOpacity>
+    </AnimatedTouchable>
   );
 };
 

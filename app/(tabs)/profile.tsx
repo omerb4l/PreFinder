@@ -9,6 +9,8 @@ import { auth, db } from '@/firebaseConfig';
 import { doc, onSnapshot, collection, query, where, getDocs, getDoc } from 'firebase/firestore';
 import { EditProfileModal } from '@/components/EditProfileModal';
 import { PrimaryButton } from '@/components/PrimaryButton';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import { AnimatedTouchable } from '@/components/AnimatedTouchable';
 
 interface ReviewItem {
   id: string;
@@ -448,32 +450,32 @@ export default function ProfileScreen() {
 
         {/* Tab Switcher */}
         <View style={styles.tabsContainer}>
-          <TouchableOpacity 
+          <AnimatedTouchable 
             style={[styles.tabButton, activeTab === 'reviews' && styles.tabButtonActive]}
             onPress={() => setActiveTab('reviews')}
           >
             <Text style={[styles.tabButtonText, activeTab === 'reviews' && styles.tabButtonTextActive]}>
               Değerlendirmeler ({reviews.length})
             </Text>
-          </TouchableOpacity>
+          </AnimatedTouchable>
 
-          <TouchableOpacity 
+          <AnimatedTouchable 
             style={[styles.tabButton, activeTab === 'posts' && styles.tabButtonActive]}
             onPress={() => setActiveTab('posts')}
           >
             <Text style={[styles.tabButtonText, activeTab === 'posts' && styles.tabButtonTextActive]}>
               Konular ({userPosts.length})
             </Text>
-          </TouchableOpacity>
+          </AnimatedTouchable>
 
-          <TouchableOpacity 
+          <AnimatedTouchable 
             style={[styles.tabButton, activeTab === 'comments' && styles.tabButtonActive]}
             onPress={() => setActiveTab('comments')}
           >
             <Text style={[styles.tabButtonText, activeTab === 'comments' && styles.tabButtonTextActive]}>
               Yanıtlar ({userComments.length})
             </Text>
-          </TouchableOpacity>
+          </AnimatedTouchable>
         </View>
 
         {activeTab === 'reviews' && (
@@ -488,13 +490,17 @@ export default function ProfileScreen() {
                 <Text style={styles.emptyReviewsText}>Bu oyuncu hakkında henüz yazılı bir yorum yapılmamış.</Text>
               </View>
             ) : (
-              reviews.map((item) => {
+              reviews.map((item, index) => {
                 const dateStr = item.timestamp?.toDate()
                   ? item.timestamp.toDate().toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })
                   : 'Bilinmiyor';
 
                 return (
-                  <View key={item.id} style={styles.reviewCard}>
+                  <Animated.View
+                    key={item.id}
+                    entering={FadeInDown.duration(400).delay(Math.min(index * 80, 600))}
+                  >
+                    <View style={styles.reviewCard}>
                     <View style={styles.reviewHeader}>
                       <View style={styles.reviewerInfo}>
                         <View style={styles.reviewerAvatarWrapper}>
@@ -520,8 +526,9 @@ export default function ProfileScreen() {
                       {item.note.trim() || `${item.rating} Yıldızlı Değerlendirme`}
                     </Text>
                   </View>
-                );
-              })
+                </Animated.View>
+              );
+            })
             )}
           </View>
         )}
@@ -538,20 +545,23 @@ export default function ProfileScreen() {
                 <Text style={styles.emptyReviewsText}>Bu oyuncu henüz forum konusu açmamış.</Text>
               </View>
             ) : (
-              userPosts.map((post) => {
+              userPosts.map((post, index) => {
                 const postDateStr = post.createdAt?.toDate()
                   ? post.createdAt.toDate().toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })
                   : 'Bilinmiyor';
 
                 return (
-                  <TouchableOpacity 
-                    key={post.id} 
-                    style={styles.postCardSmall}
-                    onPress={() => router.push({
-                      pathname: '/forum-detail',
-                      params: { postId: post.id }
-                    })}
+                  <Animated.View
+                    key={post.id}
+                    entering={FadeInDown.duration(400).delay(Math.min(index * 80, 600))}
                   >
+                    <AnimatedTouchable 
+                      style={styles.postCardSmall}
+                      onPress={() => router.push({
+                        pathname: '/forum-detail',
+                        params: { postId: post.id }
+                      })}
+                    >
                     <View style={styles.postCardHeaderSmall}>
                       <View style={styles.categoryLabel}>
                         <Text style={styles.categoryLabelText}>{post.category}</Text>
@@ -573,7 +583,8 @@ export default function ProfileScreen() {
                         </View>
                       </View>
                     </View>
-                  </TouchableOpacity>
+                    </AnimatedTouchable>
+                  </Animated.View>
                 );
               })
             )}
@@ -592,20 +603,23 @@ export default function ProfileScreen() {
                 <Text style={styles.emptyReviewsText}>Bu oyuncu henüz bir konuya yanıt yazmamış.</Text>
               </View>
             ) : (
-              userComments.map((comment) => {
+              userComments.map((comment, index) => {
                 const commentDateStr = comment.createdAt?.toDate()
                   ? comment.createdAt.toDate().toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })
                   : 'Bilinmiyor';
 
                 return (
-                  <TouchableOpacity 
-                    key={comment.id} 
-                    style={styles.commentCardSmall}
-                    onPress={() => router.push({
-                      pathname: '/forum-detail',
-                      params: { postId: comment.postId }
-                    })}
+                  <Animated.View
+                    key={comment.id}
+                    entering={FadeInDown.duration(400).delay(Math.min(index * 80, 600))}
                   >
+                    <AnimatedTouchable 
+                      style={styles.commentCardSmall}
+                      onPress={() => router.push({
+                        pathname: '/forum-detail',
+                        params: { postId: comment.postId }
+                      })}
+                    >
                     <View style={styles.commentCardHeaderSmall}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1 }}>
                         <Ionicons name="arrow-undo-outline" size={14} color={Colors.primary} />
@@ -617,7 +631,8 @@ export default function ProfileScreen() {
                     </View>
                     <Text style={styles.commentContentSmall}>{comment.content}</Text>
                     <Text style={styles.viewThreadText}>Konuyu Görüntüle →</Text>
-                  </TouchableOpacity>
+                    </AnimatedTouchable>
+                  </Animated.View>
                 );
               })
             )}

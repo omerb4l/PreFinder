@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/theme';
 import { LobbyCard } from '@/components/LobbyCard';
 import { CreateLobbyModal } from '@/components/CreateLobbyModal';
+import { AnimatedTouchable } from '@/components/AnimatedTouchable';
 import { Ionicons } from '@expo/vector-icons';
 import { RankType } from '@/constants/ranks';
 import { auth, db } from '@/firebaseConfig';
@@ -165,7 +166,7 @@ export default function DashboardScreen() {
     </View>
   );
 
-  const renderLobby = ({ item }: { item: Lobby }) => (
+  const renderLobby = ({ item, index }: { item: Lobby; index: number }) => (
     <LobbyCard
       lobbyId={item.id}
       creatorId={item.creatorId}
@@ -176,6 +177,7 @@ export default function DashboardScreen() {
       maxRank={item.maxRank}
       description={item.description}
       rating="4.8"
+      index={index}
     />
   );
 
@@ -219,13 +221,12 @@ export default function DashboardScreen() {
 
         {/* Floating Action Button — Desktop only */}
         {!isMobile && (
-          <TouchableOpacity
+          <AnimatedTouchable
             style={styles.fab}
-            activeOpacity={0.9}
             onPress={handleOpenCreateModal}
           >
             <Text style={styles.fabText}>+ LOBİ OLUŞTUR</Text>
-          </TouchableOpacity>
+          </AnimatedTouchable>
         )}
 
         <CreateLobbyModal isVisible={isModalOpen} onClose={() => setIsModalOpen(false)} />

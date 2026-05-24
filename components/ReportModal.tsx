@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput, ScrollView, ActivityIndicator, Alert, Platform } from 'react-native';
 import { Colors } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { auth, db } from '@/firebaseConfig';
 import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 
@@ -111,7 +112,10 @@ export const ReportModal = ({ visible, onClose, reportedUserId }: ReportModalPro
         activeOpacity={1} 
         onPress={onClose}
       >
-        <View style={styles.container}>
+        <Animated.View 
+          entering={FadeInDown.duration(300)}
+          style={styles.container}
+        >
           <TouchableOpacity activeOpacity={1} style={styles.content}>
             <View style={styles.header}>
               <View style={styles.headerTitleRow}>
@@ -181,7 +185,7 @@ export const ReportModal = ({ visible, onClose, reportedUserId }: ReportModalPro
               </TouchableOpacity>
             </ScrollView>
           </TouchableOpacity>
-        </View>
+        </Animated.View>
       </TouchableOpacity>
     </Modal>
   );

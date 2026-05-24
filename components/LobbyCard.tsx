@@ -7,6 +7,7 @@ import { auth, db } from '@/firebaseConfig';
 import { collection, addDoc, serverTimestamp, doc, getDoc, deleteDoc, query, where, getDocs, writeBatch, onSnapshot } from 'firebase/firestore';
 import { ReportModal } from '@/components/ReportModal';
 import { useRouter } from 'expo-router';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
 interface LobbyCardProps {
   lobbyId: string;
@@ -19,6 +20,7 @@ interface LobbyCardProps {
   description?: string;
   rating: string;
   avatarUrl?: string;
+  index?: number;
 }
 
 export const LobbyCard = ({
@@ -31,7 +33,8 @@ export const LobbyCard = ({
   maxRank,
   description,
   rating,
-  avatarUrl
+  avatarUrl,
+  index
 }: LobbyCardProps) => {
   const router = useRouter();
   const { width } = useWindowDimensions();
@@ -280,7 +283,10 @@ export const LobbyCard = ({
 
   if (isWeb) {
     return (
-      <View style={styles.webCard}>
+      <Animated.View 
+        entering={FadeInDown.duration(400).delay(Math.min((index || 0) * 80, 600))}
+        style={styles.webCard}
+      >
         <TouchableOpacity 
           style={styles.webLeft}
           onPress={() => {
@@ -323,13 +329,16 @@ export const LobbyCard = ({
         <View style={styles.webRight}>
           {renderActionButton()}
         </View>
-      </View>
+      </Animated.View>
     );
   }
 
   return (
     <>
-      <View style={styles.card}>
+      <Animated.View 
+        entering={FadeInDown.duration(400).delay(Math.min((index || 0) * 80, 600))}
+        style={styles.card}
+      >
         {!isOwnLobby && (
           <TouchableOpacity
             style={styles.reportFlagBtn}
@@ -390,7 +399,7 @@ export const LobbyCard = ({
         <View style={styles.rightSection}>
           {renderActionButton()}
         </View>
-      </View>
+      </Animated.View>
 
       <ReportModal
         visible={reportModalVisible}

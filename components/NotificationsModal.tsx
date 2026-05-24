@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Platform, ActivityIndicator, Image } from 'react-native';
 import { Colors } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as Clipboard from 'expo-clipboard';
 import { auth, db } from '@/firebaseConfig';
 import { collection, query, where, onSnapshot, doc, updateDoc, getDoc } from 'firebase/firestore';
@@ -193,7 +194,10 @@ export const NotificationsModal = ({ isVisible, onClose }: NotificationsModalPro
         activeOpacity={1} 
         onPress={onClose}
       >
-        <View style={styles.container}>
+        <Animated.View 
+          entering={FadeInDown.duration(300)}
+          style={styles.container}
+        >
           <TouchableOpacity activeOpacity={1} style={styles.content}>
             <View style={styles.header}>
               <Text style={styles.title}>Bildirimler</Text>
@@ -306,7 +310,7 @@ export const NotificationsModal = ({ isVisible, onClose }: NotificationsModalPro
               )}
             </ScrollView>
           </TouchableOpacity>
-        </View>
+        </Animated.View>
       </TouchableOpacity>
     </Modal>
   );

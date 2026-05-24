@@ -6,6 +6,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { auth, db } from '@/firebaseConfig';
 import { collection, query, orderBy, onSnapshot, doc, getDoc, runTransaction, arrayUnion, arrayRemove } from 'firebase/firestore';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import { AnimatedTouchable } from '@/components/AnimatedTouchable';
 
 interface ForumPost {
   id: string;
@@ -208,7 +210,7 @@ export default function ForumScreen() {
             contentContainerStyle={styles.categoryList}
           >
             {CATEGORIES.map(category => (
-              <TouchableOpacity
+              <AnimatedTouchable
                 key={category}
                 style={[
                   styles.categoryBadge,
@@ -222,7 +224,7 @@ export default function ForumScreen() {
                 ]}>
                   {category}
                 </Text>
-              </TouchableOpacity>
+              </AnimatedTouchable>
             ))}
           </ScrollView>
 
@@ -239,21 +241,24 @@ export default function ForumScreen() {
                   <Text style={styles.emptyText}>Aradığınız kriterlere uygun konu bulunamadı.</Text>
                 </View>
               ) : (
-                filteredPosts.map(post => {
+                filteredPosts.map((post, index) => {
                   const isLiked = post.likedBy && auth.currentUser && post.likedBy.includes(auth.currentUser.uid);
                   const profile = userProfiles[post.authorId];
                   const avatarUri = profile?.profilePicBase64;
                   const rank = profile?.rank || 'Derecesiz';
 
                   return (
-                    <Pressable 
-                      key={post.id} 
-                      style={styles.postCard}
-                      onPress={() => router.push({
-                        pathname: '/forum-detail',
-                        params: { postId: post.id }
-                      })}
+                    <Animated.View
+                      key={post.id}
+                      entering={FadeInDown.duration(400).delay(Math.min(index * 80, 600))}
                     >
+                      <Pressable 
+                        style={styles.postCard}
+                        onPress={() => router.push({
+                          pathname: '/forum-detail',
+                          params: { postId: post.id }
+                        })}
+                      >
                       <View style={styles.postCardHeader}>
                         <TouchableOpacity 
                           style={styles.authorBox}
@@ -317,7 +322,8 @@ export default function ForumScreen() {
                         </View>
                         <Text style={styles.postTime}>{formatTime(post.createdAt)}</Text>
                       </View>
-                    </Pressable>
+                      </Pressable>
+                    </Animated.View>
                   );
                 })
               )}
@@ -326,13 +332,13 @@ export default function ForumScreen() {
         </ScrollView>
 
         {/* Floating Action Button */}
-        <TouchableOpacity 
+        <AnimatedTouchable 
           style={[styles.fab, isWeb && styles.webFab]} 
           onPress={() => router.push('/forum-create')}
         >
           <Ionicons name="add" size={22} color="#0F1923" />
           <Text style={styles.fabText}>Yeni Konu Aç</Text>
-        </TouchableOpacity>
+        </AnimatedTouchable>
       </View>
     </SafeAreaView>
   );

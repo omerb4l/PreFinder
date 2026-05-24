@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, useWindowDimensions, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, useWindowDimensions, Platform, ActivityIndicator } from 'react-native';
 import { Colors } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { auth, db } from '@/firebaseConfig';
 import { collection, query, where, onSnapshot, doc, getDoc } from 'firebase/firestore';
 import { verifyPlayerPresence } from '@/services/matchService';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
+import { AnimatedTouchable } from './AnimatedTouchable';
 
 export const PlayerVerificationToast = () => {
   const { width } = useWindowDimensions();
@@ -13,6 +15,10 @@ export const PlayerVerificationToast = () => {
   const [playerName, setPlayerName] = useState('');
   const [loadingName, setLoadingName] = useState(false);
   const [processing, setProcessing] = useState(false);
+
+  const [visibleRequest, setVisibleRequest] = useState<any>(null);
+  const opacity = useSharedValue(0);
+  const translateY = useSharedValue(50);
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -41,14 +47,30 @@ export const PlayerVerificationToast = () => {
     return () => unsubscribe();
   }, []);
 
+  // Sync animation states
+  useEffect(() => {
+    if (activeRequest) {
+      setVisibleRequest(activeRequest);
+      opacity.value = withTiming(1, { duration: 300 });
+      translateY.value = withTiming(0, { duration: 300 });
+    } else {
+      opacity.value = withTiming(0, { duration: 300 }, (finished) => {
+        if (finished) {
+          runOnJS(setVisibleRequest)(null);
+        }
+      });
+      translateY.value = withTiming(50, { duration: 300 });
+    }
+  }, [activeRequest]);
+
   // Fetch player details when active request changes
   useEffect(() => {
-    if (!activeRequest) return;
+    if (!visibleRequest) return;
 
     const fetchPlayerName = async () => {
       setLoadingName(true);
       try {
-        const userRef = doc(db, 'users', activeRequest.requesterId);
+        const userRef = doc(db, 'users', visibleRequest.requesterId);
         const userSnap = await getDoc(userRef);
         if (userSnap.exists()) {
           const data = userSnap.data();
@@ -65,19 +87,19 @@ export const PlayerVerificationToast = () => {
     };
 
     fetchPlayerName();
-  }, [activeRequest]);
+  }, [visibleRequest]);
 
   const handleAction = async (didJoin: boolean) => {
-    if (!activeRequest || processing) return;
+    if (!visibleRequest || processing) return;
 
     setProcessing(true);
     try {
       await verifyPlayerPresence(
-        activeRequest.lobbyId,
-        activeRequest.receiverId,
-        activeRequest.requesterId,
+        visibleRequest.lobbyId,
+        visibleRequest.receiverId,
+        visibleRequest.requesterId,
         didJoin,
-        activeRequest.id
+        visibleRequest.id
       );
     } catch (err) {
       console.error('Error verifying presence from toast:', err);
@@ -86,10 +108,21 @@ export const PlayerVerificationToast = () => {
     }
   };
 
-  if (!activeRequest) return null;
+  const animatedWrapperStyle = useAnimatedStyle(() => {
+    return {
+      opacity: opacity.value,
+      transform: [{ translateY: translateY.value }],
+    };
+  });
+
+  if (!visibleRequest) return null;
 
   return (
-    <View style={[styles.wrapper, isWeb ? styles.webWrapper : styles.mobileWrapper]}>
+    <Animated.View style={[
+      styles.wrapper, 
+      isWeb ? styles.webWrapper : styles.mobileWrapper,
+      animatedWrapperStyle
+    ]}>
       <View style={styles.container}>
         <View style={styles.header}>
           <Ionicons name="people-circle-outline" size={20} color={Colors.primary} />
@@ -106,23 +139,23 @@ export const PlayerVerificationToast = () => {
         </Text>
 
         <View style={styles.actions}>
-          <TouchableOpacity 
+          <AnimatedTouchable 
             style={[styles.btn, styles.yesBtn]} 
             onPress={() => handleAction(true)}
             disabled={processing}
           >
             <Text style={styles.yesBtnText}>Evet</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
+          </AnimatedTouchable>
+          <AnimatedTouchable 
             style={[styles.btn, styles.noBtn]} 
             onPress={() => handleAction(false)}
             disabled={processing}
           >
             <Text style={styles.noBtnText}>Hayır</Text>
-          </TouchableOpacity>
+          </AnimatedTouchable>
         </View>
       </View>
-    </View>
+    </Animated.View>
   );
 };
 

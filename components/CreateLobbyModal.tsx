@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput, ScrollView, Image, Alert, Platform } from 'react-native';
 import { Colors } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { PrimaryButton } from './PrimaryButton';
 import { VALORANT_RANKS, RankType } from '@/constants/ranks';
 import { auth, db } from '@/firebaseConfig';
@@ -144,7 +145,11 @@ export const CreateLobbyModal = ({ isVisible, onClose }: CreateLobbyModalProps) 
         }}
       >
         {/* Main card — stops tap propagation */}
-        <TouchableOpacity activeOpacity={1} style={styles.container}>
+        <Animated.View 
+          entering={FadeInDown.duration(300)}
+          style={styles.animatedWrapper}
+        >
+          <TouchableOpacity activeOpacity={1} style={styles.container}>
 
           <View style={styles.header}>
             <Text style={styles.title}>Yeni Lobi Oluştur</Text>
@@ -337,7 +342,8 @@ export const CreateLobbyModal = ({ isVisible, onClose }: CreateLobbyModalProps) 
             </ScrollView>
           )}
 
-        </TouchableOpacity>
+          </TouchableOpacity>
+        </Animated.View>
       </TouchableOpacity>
     </Modal>
   );
@@ -350,6 +356,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+  },
+  animatedWrapper: {
+    width: '100%',
+    maxWidth: 400,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   container: {
     backgroundColor: Colors.surface,
