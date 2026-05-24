@@ -174,7 +174,7 @@ export default function ForumScreen() {
   });
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
       <View style={{ flex: 1, position: 'relative' }}>
         <ScrollView 
           style={styles.container}

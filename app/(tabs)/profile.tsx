@@ -293,7 +293,7 @@ export default function ProfileScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
       
       {/* Back button header (only if viewing someone else's profile) */}
       {!isOwnProfile && (

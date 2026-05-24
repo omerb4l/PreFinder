@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Platform, useWindowDimensions, Text, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '@/constants/theme';
+import { Colors, getThemeMode, subscribeTheme, toggleTheme } from '@/constants/theme';
 import { TopNavBar } from '@/components/TopNavBar';
 import { NotificationsModal } from '@/components/NotificationsModal';
 import { CreateLobbyModal } from '@/components/CreateLobbyModal';
@@ -18,6 +18,14 @@ export default function TabLayout() {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isLobbyModalOpen, setIsLobbyModalOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [themeMode, setThemeMode] = useState(getThemeMode());
+
+  useEffect(() => {
+    const unsubscribeTheme = subscribeTheme((newTheme) => {
+      setThemeMode(newTheme);
+    });
+    return () => unsubscribeTheme();
+  }, []);
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -56,20 +64,32 @@ export default function TabLayout() {
 
   // Mobile Header Component
   const MobileHeader = () => (
-    <SafeAreaView style={styles.mobileHeaderWrapper}>
+    <SafeAreaView style={styles.mobileHeaderWrapper} edges={['top', 'left', 'right']}>
       <View style={styles.mobileHeader}>
         <Text style={styles.logoText}>
           Pre<Text style={styles.logoAccent}>Finder</Text>
         </Text>
-        <TouchableOpacity 
-          onPress={() => setIsNotificationsOpen(true)}
-          style={styles.iconButton}
-        >
-          <View>
-            <Ionicons name="notifications-outline" size={24} color={Colors.text} />
-            {unreadCount > 0 && <View style={styles.badge} />}
-          </View>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <TouchableOpacity 
+            onPress={toggleTheme}
+            style={styles.iconButton}
+          >
+            <Ionicons 
+              name={themeMode === 'light' ? "moon-outline" : "sunny-outline"} 
+              size={22} 
+              color={Colors.text} 
+            />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            onPress={() => setIsNotificationsOpen(true)}
+            style={styles.iconButton}
+          >
+            <View>
+              <Ionicons name="notifications-outline" size={24} color={Colors.text} />
+              {unreadCount > 0 && <View style={styles.badge} />}
+            </View>
+          </TouchableOpacity>
+        </View>
       </View>
     </SafeAreaView>
   );
