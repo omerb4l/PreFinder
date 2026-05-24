@@ -6,12 +6,12 @@
 import { Platform } from 'react-native';
 
 export const Colors = {
-  background: '#0F1923',
-  surface: '#1F2326',
-  primary: '#00FF87',
-  text: '#ECE8E1',
+  background: Platform.OS === 'web' ? 'var(--background)' : '#0F1923',
+  surface: Platform.OS === 'web' ? 'var(--surface)' : '#1F2326',
+  primary: Platform.OS === 'web' ? 'var(--primary)' : '#00FF87',
+  text: Platform.OS === 'web' ? 'var(--text)' : '#ECE8E1',
   danger: '#FF4655',
-  gray: '#8B97A3',
+  gray: Platform.OS === 'web' ? 'var(--gray)' : '#8B97A3',
   light: {
     text: '#ECE8E1',
     background: '#0F1923',
@@ -44,18 +44,35 @@ export const subscribeTheme = (listener: (theme: 'dark' | 'light') => void) => {
 
 export const toggleTheme = () => {
   currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
-  if (currentTheme === 'light') {
-    Colors.background = '#ECE8E1'; // Light off-white sand background
-    Colors.surface = '#F5F2EC';    // Lighter card/surface
-    Colors.text = '#0F1923';       // Dark text
-    Colors.gray = '#6A7680';       // Darker gray for readability
-    Colors.primary = '#FF4655';    // Valorant Red for light mode
+  if (Platform.OS === 'web') {
+    const root = document.documentElement;
+    if (currentTheme === 'light') {
+      root.style.setProperty('--background', '#ECE8E1');
+      root.style.setProperty('--surface', '#F5F2EC');
+      root.style.setProperty('--text', '#0F1923');
+      root.style.setProperty('--gray', '#6A7680');
+      root.style.setProperty('--primary', '#FF4655');
+    } else {
+      root.style.setProperty('--background', '#0F1923');
+      root.style.setProperty('--surface', '#1F2326');
+      root.style.setProperty('--text', '#ECE8E1');
+      root.style.setProperty('--gray', '#8B97A3');
+      root.style.setProperty('--primary', '#00FF87');
+    }
   } else {
-    Colors.background = '#0F1923'; // Dark background
-    Colors.surface = '#1F2326';    // Dark surface
-    Colors.text = '#ECE8E1';       // Light text
-    Colors.gray = '#8B97A3';       // Light gray
-    Colors.primary = '#00FF87';    // Valorant Neon Green
+    if (currentTheme === 'light') {
+      Colors.background = '#ECE8E1'; // Light off-white sand background
+      Colors.surface = '#F5F2EC';    // Lighter card/surface
+      Colors.text = '#0F1923';       // Dark text
+      Colors.gray = '#6A7680';       // Darker gray for readability
+      Colors.primary = '#FF4655';    // Valorant Red for light mode
+    } else {
+      Colors.background = '#0F1923'; // Dark background
+      Colors.surface = '#1F2326';    // Dark surface
+      Colors.text = '#ECE8E1';       // Light text
+      Colors.gray = '#8B97A3';       // Light gray
+      Colors.primary = '#00FF87';    // Valorant Neon Green
+    }
   }
   listeners.forEach(l => l(currentTheme));
 };

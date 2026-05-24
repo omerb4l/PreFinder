@@ -25,6 +25,17 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
+    if (Platform.OS === 'web') {
+      const root = document.documentElement;
+      root.style.setProperty('--background', '#0F1923');
+      root.style.setProperty('--surface', '#1F2326');
+      root.style.setProperty('--primary', '#00FF87');
+      root.style.setProperty('--text', '#ECE8E1');
+      root.style.setProperty('--gray', '#8B97A3');
+    }
+  }, []);
+
+  useEffect(() => {
     let unsubUserDoc: (() => void) | undefined;
 
     const unsubAuth = onAuthStateChanged(auth, (user) => {
