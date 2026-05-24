@@ -8,6 +8,7 @@ import { TopNavBar } from '@/components/TopNavBar';
 import { NotificationsModal } from '@/components/NotificationsModal';
 import { CreateLobbyModal } from '@/components/CreateLobbyModal';
 import { PlayerVerificationToast } from '@/components/PlayerVerificationToast';
+import { FloatingChat } from '@/components/FloatingChat';
 import { auth, db } from '@/firebaseConfig';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 
@@ -159,6 +160,8 @@ export default function TabLayout() {
       />
 
       <PlayerVerificationToast />
+
+      <FloatingChat />
     </View>
   );
 }
