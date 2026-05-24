@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Platform, useWindowDimensions, Text, TouchableOpacity, SafeAreaView } from 'react-native';
+import { View, StyleSheet, Platform, useWindowDimensions, Text, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/theme';
 import { TopNavBar } from '@/components/TopNavBar';
