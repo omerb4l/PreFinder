@@ -8,6 +8,8 @@ import { Link, router } from 'expo-router';
 import { auth, db } from '@/firebaseConfig';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
+import SplitText from '@/components/SplitText';
+import AuthBackground from '@/components/AuthBackground';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -74,16 +76,25 @@ export default function LoginScreen() {
   };
 
   return (
-    <KeyboardAvoidingView 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={{ flex: 1 }}
-    >
+    <AuthBackground>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
       <ScrollView contentContainerStyle={{ flexGrow: 1 }} bounces={false}>
         <AuthCard>
           <View style={styles.header}>
-            <Text style={styles.title}>
-              Pre<Text style={styles.accent}>Finder</Text>
-            </Text>
+            <SplitText
+              text="PreFinder"
+              className="split-text-title"
+              delay={80}
+              duration={0.8}
+              ease="power3.out"
+              splitType="chars"
+              from={{ opacity: 0, y: 30 }}
+              to={{ opacity: 1, y: 0 }}
+              textAlign="center"
+            />
           </View>
 
           <View style={styles.form}>
@@ -128,6 +139,7 @@ export default function LoginScreen() {
         </AuthCard>
       </ScrollView>
     </KeyboardAvoidingView>
+    </AuthBackground>
   );
 }
 

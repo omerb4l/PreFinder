@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Platform, useWindowDimensions, Pressable, ActivityIndicator, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Colors } from '@/constants/theme';
+import { Colors, getThemeMode, subscribeTheme } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { auth, db } from '@/firebaseConfig';
@@ -30,10 +30,16 @@ export default function ForumScreen() {
   const isWeb = Platform.OS === 'web' && width >= 768;
   const router = useRouter();
 
+  const [themeMode, setThemeMode] = useState(getThemeMode());
   const [posts, setPosts] = useState<ForumPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState("Tümü");
   const [searchQuery, setSearchQuery] = useState("");
+
+  useEffect(() => {
+    const unsub = subscribeTheme((t) => setThemeMode(t));
+    return () => unsub();
+  }, []);
   
   // Cache user profiles to show author avatars and ranks dynamically
   const [userProfiles, setUserProfiles] = useState<Record<string, { profilePicBase64?: string; rank?: string }>>({});

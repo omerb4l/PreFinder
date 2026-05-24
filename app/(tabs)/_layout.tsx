@@ -64,22 +64,12 @@ export default function TabLayout() {
 
   // Mobile Header Component
   const MobileHeader = () => (
-    <SafeAreaView style={styles.mobileHeaderWrapper} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={[styles.mobileHeaderWrapper, { backgroundColor: Colors.surface, borderBottomColor: Colors.surface === '#F5F2EC' ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)' }]} edges={['top', 'left', 'right']}>
       <View style={styles.mobileHeader}>
         <Text style={styles.logoText}>
           Pre<Text style={styles.logoAccent}>Finder</Text>
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <TouchableOpacity 
-            onPress={toggleTheme}
-            style={styles.iconButton}
-          >
-            <Ionicons 
-              name={themeMode === 'light' ? "moon-outline" : "sunny-outline"} 
-              size={22} 
-              color={Colors.text} 
-            />
-          </TouchableOpacity>
           <TouchableOpacity 
             onPress={() => setIsNotificationsOpen(true)}
             style={styles.iconButton}
@@ -95,7 +85,7 @@ export default function TabLayout() {
   );
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: Colors.background }]}>
       {/* Conditional Desktop Nav */}
       {!isMobile && (
         <TopNavBar 

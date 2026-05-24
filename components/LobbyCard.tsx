@@ -339,15 +339,6 @@ export const LobbyCard = ({
         entering={FadeInDown.duration(400).delay(Math.min((index || 0) * 80, 600))}
         style={styles.card}
       >
-        {!isOwnLobby && (
-          <TouchableOpacity
-            style={styles.reportFlagBtn}
-            onPress={() => setReportModalVisible(true)}
-          >
-            <Ionicons name="flag-outline" size={20} color={Colors.gray} />
-          </TouchableOpacity>
-        )}
-
         <TouchableOpacity 
           style={styles.leftSection}
           onPress={() => {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Platform, useWindowDimensions, Image, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Colors } from '@/constants/theme';
+import { Colors, getThemeMode, subscribeTheme } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { auth, db } from '@/firebaseConfig';
@@ -28,10 +28,17 @@ interface TeammateItem {
 export default function ReportScreen() {
   const { width } = useWindowDimensions();
   const isWeb = Platform.OS === 'web' && width >= 768;
+
+  const [themeMode, setThemeMode] = useState(getThemeMode());
   
   const [teammates, setTeammates] = useState<TeammateItem[]>([]);
   const [loadingTeammates, setLoadingTeammates] = useState(true);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const unsub = subscribeTheme((t) => setThemeMode(t));
+    return () => unsub();
+  }, []);
   const [selectedUserRiotId, setSelectedUserRiotId] = useState<string | null>(null);
   const [selectedReason, setSelectedReason] = useState('');
   const [explanation, setExplanation] = useState('');

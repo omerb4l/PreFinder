@@ -8,6 +8,8 @@ import { Link, router } from 'expo-router';
 import { auth, db } from '@/firebaseConfig';
 import { createUserWithEmailAndPassword, sendEmailVerification, signOut } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import AuthBackground from '@/components/AuthBackground';
+
 export default function RegisterScreen() {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -89,10 +91,11 @@ export default function RegisterScreen() {
   };
 
   return (
-    <KeyboardAvoidingView 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={{ flex: 1 }}
-    >
+    <AuthBackground>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
       <ScrollView contentContainerStyle={{ flexGrow: 1 }} bounces={false}>
         <AuthCard>
           <View style={styles.header}>
@@ -163,6 +166,7 @@ export default function RegisterScreen() {
         </AuthCard>
       </ScrollView>
     </KeyboardAvoidingView>
+    </AuthBackground>
   );
 }
 

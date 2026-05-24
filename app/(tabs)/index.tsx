@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Platform, useWindowDimensions, ActivityIndicator, Modal, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Colors } from '@/constants/theme';
+import { Colors, getThemeMode, subscribeTheme } from '@/constants/theme';
 import { LobbyCard } from '@/components/LobbyCard';
 import { CreateLobbyModal } from '@/components/CreateLobbyModal';
 import { AnimatedTouchable } from '@/components/AnimatedTouchable';
@@ -47,10 +47,17 @@ export default function DashboardScreen() {
   const { width } = useWindowDimensions();
   const isWeb = Platform.OS === 'web' && width >= 768;
   const isMobile = width < 768;
+
+  const [themeMode, setThemeMode] = useState(getThemeMode());
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [lobbies, setLobbies] = useState<Lobby[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsub = subscribeTheme((t) => setThemeMode(t));
+    return () => unsub();
+  }, []);
   
   // Filters
   const [filterMode, setFilterMode] = useState("Tüm Modlar");

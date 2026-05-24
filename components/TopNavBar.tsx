@@ -47,7 +47,7 @@ export const TopNavBar = ({ onOpenNotifications, hasUnread = false }: TopNavBarP
   const isActive = (path: string) => pathname === path;
 
   return (
-    <View style={styles.topNav}>
+    <View style={[styles.topNav, { backgroundColor: Colors.surface, borderBottomColor: Colors.surface === '#F5F2EC' ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)' }]}>
       <View style={styles.navLeft}>
         <TouchableOpacity onPress={() => router.push('/')}>
           <Text style={styles.logoText}>

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, Platform, useWindowDimensions, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Colors } from '@/constants/theme';
+import { Colors, getThemeMode, subscribeTheme } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { VALORANT_RANKS } from '@/constants/ranks';
 import { auth, db } from '@/firebaseConfig';
@@ -27,6 +27,13 @@ export default function ProfileScreen() {
   const isWeb = Platform.OS === 'web' && width >= 768;
   const router = useRouter();
   const { targetUserId } = useLocalSearchParams<{ targetUserId?: string }>();
+
+  const [themeMode, setThemeMode] = useState(getThemeMode());
+
+  useEffect(() => {
+    const unsub = subscribeTheme((t) => setThemeMode(t));
+    return () => unsub();
+  }, []);
 
   // Determine if viewing own profile
   const isOwnProfile = !targetUserId || targetUserId === auth.currentUser?.uid;
