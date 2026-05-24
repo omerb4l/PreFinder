@@ -8,8 +8,6 @@ import { collection, addDoc, serverTimestamp, doc, getDoc, deleteDoc, query, whe
 import { ReportModal } from '@/components/ReportModal';
 import { useRouter } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { BlurView } from 'expo-blur';
-import { AnimatedTouchable } from './AnimatedTouchable';
 
 interface LobbyCardProps {
   lobbyId: string;
@@ -222,7 +220,7 @@ export const LobbyCard = ({
   const renderActionButton = () => {
     if (isOwnLobby) {
       return (
-        <AnimatedTouchable
+        <TouchableOpacity
           style={[styles.actionButton, styles.closeLobbyBtn]}
           onPress={handleCloseLobby}
           disabled={isClosing}
@@ -232,13 +230,13 @@ export const LobbyCard = ({
           ) : (
             <Text style={styles.closeLobbyText}>{isWeb ? 'Lobiyi Kapat' : 'Kapat'}</Text>
           )}
-        </AnimatedTouchable>
+        </TouchableOpacity>
       );
     }
 
     if (requestStatus === 'accepted') {
       return (
-        <View style={[styles.actionButton, styles.acceptedBtn, styles.glowPrimary]}>
+        <View style={[styles.actionButton, styles.acceptedBtn]}>
           <Text style={styles.acceptedBtnText}>Kabul Edildi</Text>
         </View>
       );
@@ -246,7 +244,7 @@ export const LobbyCard = ({
 
     if (requestId && requestStatus === 'pending') {
       return (
-        <AnimatedTouchable
+        <TouchableOpacity
           style={[styles.actionButton, styles.cancelBtn]}
           onPress={handleCancelRequest}
           disabled={isRequesting}
@@ -256,7 +254,7 @@ export const LobbyCard = ({
           ) : (
             <Text style={styles.cancelBtnText}>İptal Et</Text>
           )}
-        </AnimatedTouchable>
+        </TouchableOpacity>
       );
     }
 
@@ -269,8 +267,8 @@ export const LobbyCard = ({
     }
 
     return (
-      <AnimatedTouchable
-        style={[styles.actionButton, styles.glowPrimary]}
+      <TouchableOpacity
+        style={styles.actionButton}
         onPress={handleSendRequest}
         disabled={isRequesting}
       >
@@ -279,35 +277,16 @@ export const LobbyCard = ({
         ) : (
           <Text style={styles.actionButtonText}>İstek Gönder</Text>
         )}
-      </AnimatedTouchable>
+      </TouchableOpacity>
     );
   };
-
-  const glassBg = Colors.surface === '#F5F2EC' 
-    ? 'rgba(245, 242, 236, 0.65)' 
-    : 'rgba(31, 35, 38, 0.45)';
-
-  const glassBorder = Colors.surface === '#F5F2EC'
-    ? 'rgba(15, 25, 35, 0.06)'
-    : 'rgba(255, 255, 255, 0.08)';
 
   if (isWeb) {
     return (
       <Animated.View 
-        entering={FadeInDown.duration(500).delay(Math.min((index || 0) * 80, 600)).springify().damping(15)}
-        style={[
-          styles.webCard,
-          { backgroundColor: glassBg, borderColor: glassBorder },
-          Platform.OS === 'web' ? { backdropFilter: 'blur(20px)' } as any : {}
-        ]}
+        entering={FadeInDown.duration(400).delay(Math.min((index || 0) * 80, 600))}
+        style={styles.webCard}
       >
-        {Platform.OS !== 'web' && (
-          <BlurView 
-            intensity={20} 
-            tint={Colors.surface === '#F5F2EC' ? 'light' : 'dark'} 
-            style={StyleSheet.absoluteFill} 
-          />
-        )}
         <TouchableOpacity 
           style={styles.webLeft}
           onPress={() => {
@@ -357,19 +336,9 @@ export const LobbyCard = ({
   return (
     <>
       <Animated.View 
-        entering={FadeInDown.duration(500).delay(Math.min((index || 0) * 80, 600)).springify().damping(15)}
-        style={[
-          styles.card,
-          { backgroundColor: glassBg, borderColor: glassBorder }
-        ]}
+        entering={FadeInDown.duration(400).delay(Math.min((index || 0) * 80, 600))}
+        style={styles.card}
       >
-        {Platform.OS !== 'web' && (
-          <BlurView 
-            intensity={20} 
-            tint={Colors.surface === '#F5F2EC' ? 'light' : 'dark'} 
-            style={StyleSheet.absoluteFill} 
-          />
-        )}
         {!isOwnLobby && (
           <TouchableOpacity
             style={styles.reportFlagBtn}
@@ -484,15 +453,16 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   webCard: {
-    borderRadius: 12,
+    backgroundColor: Colors.surface,
+    borderRadius: 8,
     paddingHorizontal: 20,
-    height: 95,
+    height: 90,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: 12,
     width: '100%',
     borderWidth: 1,
-    overflow: 'hidden',
+    borderColor: 'rgba(255,255,255,0.05)',
   },
   webLeft: {
     flexDirection: 'row',
@@ -540,14 +510,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   card: {
-    borderRadius: 12,
+    backgroundColor: Colors.surface,
+    borderRadius: 8,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 14,
+    marginBottom: 12,
     width: '100%',
-    borderWidth: 1,
-    overflow: 'hidden',
   },
   leftSection: {
     alignItems: 'center',
@@ -612,13 +581,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 6,
-  },
-  glowPrimary: {
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 4,
   },
   actionButtonText: {
     color: Colors.primary,

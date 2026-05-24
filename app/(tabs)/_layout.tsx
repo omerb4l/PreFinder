@@ -1,7 +1,6 @@
 import { Tabs } from 'expo-router';
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Platform, useWindowDimensions, Text, TouchableOpacity } from 'react-native';
-import { AnimatedTouchable } from '@/components/AnimatedTouchable';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/theme';
@@ -120,16 +119,12 @@ export default function TabLayout() {
           name="create"
           options={{
             title: 'Lobi Kur',
-            tabBarButton: (props) => (
-              <AnimatedTouchable
-                {...props}
-                style={[props.style, { justifyContent: 'center', alignItems: 'center' }]}
-              >
-                <View style={styles.createTabButton}>
-                  <Ionicons size={24} name="add" color={Colors.background} />
-                </View>
-              </AnimatedTouchable>
+            tabBarIcon: () => (
+              <View style={styles.createTabButton}>
+                <Ionicons size={24} name="add" color="#0F1923" />
+              </View>
             ),
+            tabBarLabel: () => null,
           }}
           listeners={{
             tabPress: (e) => {
@@ -219,9 +214,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: Platform.OS === 'ios' ? 0 : 5,
     shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 12,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
   },
 });
