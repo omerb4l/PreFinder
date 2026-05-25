@@ -8,6 +8,9 @@ import { auth, db } from '@/firebaseConfig';
 import { collection, query, orderBy, onSnapshot, doc, getDoc, runTransaction, arrayUnion, arrayRemove } from 'firebase/firestore';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { AnimatedTouchable } from '@/components/AnimatedTouchable';
+import SpotlightCard from '@/components/SpotlightCard';
+import ShinyText from '@/components/ShinyText';
+import TiltedCard from '@/components/TiltedCard';
 
 interface ForumPost {
   id: string;
@@ -188,7 +191,14 @@ export default function ForumScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.header}>
-            <Text style={styles.title}>Topluluk Forumu</Text>
+            <ShinyText
+              text="Topluluk Forumu"
+              style={styles.title}
+              speed={3}
+              delay={1.5}
+              color="#ECE8E1"
+              shineColor="#00FF87"
+            />
             <Text style={styles.subtitle}>Fikirlerinizi paylaşın, taktik alışverişinde bulunun.</Text>
           </View>
 
@@ -253,18 +263,8 @@ export default function ForumScreen() {
                   const avatarUri = profile?.profilePicBase64;
                   const rank = profile?.rank || 'Derecesiz';
 
-                  return (
-                    <Animated.View
-                      key={post.id}
-                      entering={FadeInDown.duration(400).delay(Math.min(index * 80, 600))}
-                    >
-                      <Pressable 
-                        style={styles.postCard}
-                        onPress={() => router.push({
-                          pathname: '/forum-detail',
-                          params: { postId: post.id }
-                        })}
-                      >
+                  const cardContent = (
+                    <>
                       <View style={styles.postCardHeader}>
                         <TouchableOpacity 
                           style={styles.authorBox}
@@ -298,9 +298,10 @@ export default function ForumScreen() {
 
                       {post.base64Image ? (
                         <View style={styles.postCardImageContainer}>
-                          <Image 
-                            source={{ uri: `data:image/jpeg;base64,${post.base64Image}` }} 
-                            style={styles.postCardImage} 
+                           <TiltedCard 
+                            imageSrc={`data:image/jpeg;base64,${post.base64Image}`} 
+                            containerHeight={180}
+                            containerWidth="100%"
                           />
                         </View>
                       ) : null}
@@ -328,7 +329,37 @@ export default function ForumScreen() {
                         </View>
                         <Text style={styles.postTime}>{formatTime(post.createdAt)}</Text>
                       </View>
-                      </Pressable>
+                    </>
+                  );
+
+                  return (
+                    <Animated.View
+                      key={post.id}
+                      entering={FadeInDown.duration(400).delay(Math.min(index * 80, 600))}
+                    >
+                      {Platform.OS === 'web' ? (
+                        <SpotlightCard style={[styles.postCard, { padding: 0 }] as any}>
+                          <Pressable 
+                            style={{ padding: 16, width: '100%', backgroundColor: 'transparent' }}
+                            onPress={() => router.push({
+                              pathname: '/forum-detail',
+                              params: { postId: post.id }
+                            })}
+                          >
+                            {cardContent}
+                          </Pressable>
+                        </SpotlightCard>
+                      ) : (
+                        <Pressable 
+                          style={styles.postCard}
+                          onPress={() => router.push({
+                            pathname: '/forum-detail',
+                            params: { postId: post.id }
+                          })}
+                        >
+                          {cardContent}
+                        </Pressable>
+                      )}
                     </Animated.View>
                   );
                 })

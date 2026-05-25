@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { auth, db } from '@/firebaseConfig';
 import { doc, onSnapshot, collection, query, where, addDoc, serverTimestamp, runTransaction, getDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import TiltedCard from '@/components/TiltedCard';
 
 interface ForumPost {
   id: string;
@@ -41,6 +42,7 @@ export default function PostDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [newComment, setNewComment] = useState('');
   const [currentUserRiotId, setCurrentUserRiotId] = useState('');
+  const [imageAspectRatio, setImageAspectRatio] = useState<number | undefined>(undefined);
 
   // Cache profiles for comment authors and post author
   const [profiles, setProfiles] = useState<Record<string, { profilePicBase64?: string; rank?: string }>>({});
@@ -63,6 +65,32 @@ export default function PostDetailScreen() {
     };
     fetchCurrentUserProfile();
   }, []);
+
+  // Fetch image dimensions to calculate original aspect ratio dynamically
+  useEffect(() => {
+    if (post && post.base64Image) {
+      const uri = `data:image/jpeg;base64,${post.base64Image}`;
+      if (Platform.OS === 'web') {
+        const img = new window.Image();
+        img.onload = () => {
+          if (img.naturalHeight > 0) {
+            setImageAspectRatio(img.naturalWidth / img.naturalHeight);
+          }
+        };
+        img.src = uri;
+      } else {
+        Image.getSize(uri, (w, h) => {
+          if (h > 0) {
+            setImageAspectRatio(w / h);
+          }
+        }, (err) => {
+          console.warn("Failed to get image size:", err);
+        });
+      }
+    } else {
+      setImageAspectRatio(undefined);
+    }
+  }, [post]);
 
   // 2. Listen to the specific post in real-time
   useEffect(() => {
@@ -309,7 +337,7 @@ export default function PostDetailScreen() {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         {/* Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, isWeb && styles.webHeader]}>
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color={Colors.text} />
           </TouchableOpacity>
@@ -359,10 +387,15 @@ export default function PostDetailScreen() {
 
               {/* Base64 Post Image if exists */}
               {post.base64Image && (
-                <View style={styles.postImageContainer}>
-                  <Image 
-                    source={{ uri: `data:image/jpeg;base64,${post.base64Image}` }} 
-                    style={styles.postImage} 
+                <View style={[
+                  styles.postImageContainer,
+                  imageAspectRatio ? { height: undefined, aspectRatio: imageAspectRatio } : null
+                ]}>
+                  <TiltedCard 
+                    imageSrc={`data:image/jpeg;base64,${post.base64Image}`} 
+                    containerHeight={imageAspectRatio ? undefined : 250}
+                    containerWidth="100%"
+                    aspectRatio={imageAspectRatio}
                   />
                 </View>
               )}
@@ -478,6 +511,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  webHeader: {
+    paddingHorizontal: '25%',
+    paddingVertical: 20,
   },
   backButton: {
     padding: 8,

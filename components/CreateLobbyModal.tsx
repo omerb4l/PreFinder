@@ -150,72 +150,21 @@ export const CreateLobbyModal = ({ isVisible, onClose }: CreateLobbyModalProps) 
           style={styles.animatedWrapper}
         >
           <TouchableOpacity activeOpacity={1} style={styles.container}>
+            {activePicker !== null && (
+              <TouchableOpacity
+                style={styles.modalBackdrop}
+                activeOpacity={1}
+                onPress={() => setActivePicker(null)}
+              />
+            )}
 
-          <View style={styles.header}>
-            <Text style={styles.title}>Yeni Lobi Oluştur</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Ionicons name="close" size={24} color={Colors.text} />
-            </TouchableOpacity>
-          </View>
-
-          {/* ---- RANK PICKER OVERLAY (absolute, covers entire card) ---- */}
-          {activePicker && (
-            <View style={styles.rankPickerOverlay}>
-              <View style={styles.pickerHeader}>
-                <Text style={styles.pickerTitle}>
-                  {activePicker === 'min' ? 'Minimum Rütbe' : 'Maximum Rütbe'}
-                </Text>
-                <TouchableOpacity onPress={() => setActivePicker(null)}>
-                  <Ionicons name="close" size={20} color={Colors.gray} />
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-                {RANK_KEYS.map((key) => {
-                  const rank = VALORANT_RANKS[key];
-                  const isSelected = (activePicker === 'min' ? minRank : maxRank) === key;
-                  // Disable ranks that would make range invalid
-                  const isDisabled =
-                    activePicker === 'min'
-                      ? RANK_ORDER[key] > RANK_ORDER[maxRank]   // min can't exceed max
-                      : RANK_ORDER[key] < RANK_ORDER[minRank];  // max can't go below min
-                  return (
-                    <TouchableOpacity
-                      key={key}
-                      style={[
-                        styles.rankOption,
-                        isSelected && styles.rankOptionSelected,
-                        isDisabled && styles.rankOptionDisabled,
-                      ]}
-                      onPress={() => !isDisabled && selectRank(key)}
-                      activeOpacity={isDisabled ? 1 : 0.7}
-                    >
-                      <Image
-                        source={rank.icon}
-                        style={[styles.rankOptionIcon, isDisabled && { opacity: 0.3 }]}
-                      />
-                      <Text style={[
-                        styles.rankOptionText,
-                        isSelected && styles.rankOptionTextSelected,
-                        isDisabled && styles.rankOptionTextDisabled,
-                      ]}>
-                        {rank.name}
-                      </Text>
-                      {isSelected && !isDisabled && (
-                        <Ionicons name="checkmark-circle" size={18} color={Colors.primary} />
-                      )}
-                      {isDisabled && (
-                        <Ionicons name="ban" size={14} color="rgba(255,255,255,0.15)" />
-                      )}
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
+            <View style={styles.header}>
+              <Text style={styles.title}>Yeni Lobi Oluştur</Text>
+              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+                <Ionicons name="close" size={24} color={Colors.text} />
+              </TouchableOpacity>
             </View>
-          )}
 
-          {/* ---- MAIN FORM (hidden behind picker when open) ---- */}
-          {!activePicker && (
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               
               {/* Game Mode Selection */}
@@ -291,27 +240,95 @@ export const CreateLobbyModal = ({ isVisible, onClose }: CreateLobbyModalProps) 
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Rank Aralığı</Text>
                 <View style={styles.rankRow}>
-                  <TouchableOpacity
-                    style={styles.rankSelectorBtn}
-                    onPress={() => setActivePicker('min')}
-                    activeOpacity={0.7}
-                  >
-                    <Image source={VALORANT_RANKS[minRank].icon} style={styles.rankSelectorIcon} />
-                    <Text style={styles.rankSelectorText}>{VALORANT_RANKS[minRank].name}</Text>
-                    <Ionicons name="chevron-down" size={14} color={Colors.gray} />
-                  </TouchableOpacity>
+                  {/* Min Rank Button Wrapper */}
+                  <View style={{ flex: 1, position: 'relative', zIndex: activePicker === 'min' ? 20 : 1 }}>
+                    <TouchableOpacity
+                      style={styles.rankSelectorBtn}
+                      onPress={() => setActivePicker(activePicker === 'min' ? null : 'min')}
+                      activeOpacity={0.7}
+                    >
+                      <Image source={VALORANT_RANKS[minRank].icon} style={styles.rankSelectorIcon} />
+                      <Text style={styles.rankSelectorText}>{VALORANT_RANKS[minRank].name}</Text>
+                      <Ionicons name="chevron-down" size={14} color={Colors.gray} />
+                    </TouchableOpacity>
+
+                    {activePicker === 'min' && (
+                      <View style={styles.lobbyRankDropdown}>
+                        <ScrollView style={styles.lobbyRankDropdownScroll} nestedScrollEnabled showsVerticalScrollIndicator={true} keyboardShouldPersistTaps="handled">
+                          {RANK_KEYS.map((key) => {
+                            const rank = VALORANT_RANKS[key];
+                            const isSelected = minRank === key;
+                            const isDisabled = RANK_ORDER[key] > RANK_ORDER[maxRank];
+                            return (
+                              <TouchableOpacity
+                                key={key}
+                                style={[
+                                  styles.lobbyRankOption,
+                                  isSelected && styles.lobbyRankOptionSelected,
+                                  isDisabled && styles.lobbyRankOptionDisabled,
+                                ]}
+                                onPress={() => !isDisabled && selectRank(key)}
+                                activeOpacity={isDisabled ? 1 : 0.7}
+                              >
+                                <Image source={rank.icon} style={styles.lobbyRankOptionIcon} />
+                                <Text style={[
+                                  styles.lobbyRankOptionText,
+                                  isSelected && styles.lobbyRankOptionTextSelected,
+                                ]}>{rank.name}</Text>
+                                {isSelected && <Ionicons name="checkmark" size={14} color={Colors.primary} style={{ marginLeft: 'auto' }} />}
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </ScrollView>
+                      </View>
+                    )}
+                  </View>
 
                   <Ionicons name="arrow-forward" size={16} color={Colors.gray} />
 
-                  <TouchableOpacity
-                    style={styles.rankSelectorBtn}
-                    onPress={() => setActivePicker('max')}
-                    activeOpacity={0.7}
-                  >
-                    <Image source={VALORANT_RANKS[maxRank].icon} style={styles.rankSelectorIcon} />
-                    <Text style={styles.rankSelectorText}>{VALORANT_RANKS[maxRank].name}</Text>
-                    <Ionicons name="chevron-down" size={14} color={Colors.gray} />
-                  </TouchableOpacity>
+                  {/* Max Rank Button Wrapper */}
+                  <View style={{ flex: 1, position: 'relative', zIndex: activePicker === 'max' ? 20 : 1 }}>
+                    <TouchableOpacity
+                      style={styles.rankSelectorBtn}
+                      onPress={() => setActivePicker(activePicker === 'max' ? null : 'max')}
+                      activeOpacity={0.7}
+                    >
+                      <Image source={VALORANT_RANKS[maxRank].icon} style={styles.rankSelectorIcon} />
+                      <Text style={styles.rankSelectorText}>{VALORANT_RANKS[maxRank].name}</Text>
+                      <Ionicons name="chevron-down" size={14} color={Colors.gray} />
+                    </TouchableOpacity>
+
+                    {activePicker === 'max' && (
+                      <View style={styles.lobbyRankDropdown}>
+                        <ScrollView style={styles.lobbyRankDropdownScroll} nestedScrollEnabled showsVerticalScrollIndicator={true} keyboardShouldPersistTaps="handled">
+                          {RANK_KEYS.map((key) => {
+                            const rank = VALORANT_RANKS[key];
+                            const isSelected = maxRank === key;
+                            const isDisabled = RANK_ORDER[key] < RANK_ORDER[minRank];
+                            return (
+                              <TouchableOpacity
+                                key={key}
+                                style={[
+                                  styles.lobbyRankOption,
+                                  isSelected && styles.lobbyRankOptionSelected,
+                                  isDisabled && styles.lobbyRankOptionDisabled,
+                                ]}
+                                onPress={() => !isDisabled && selectRank(key)}
+                                activeOpacity={isDisabled ? 1 : 0.7}
+                              >
+                                <Image source={rank.icon} style={styles.lobbyRankOptionIcon} />
+                                <Text style={[
+                                  styles.lobbyRankOptionText,
+                                  isSelected && styles.lobbyRankOptionTextSelected,
+                                ]}>{rank.name}</Text>
+                                {isSelected && <Ionicons name="checkmark" size={14} color={Colors.primary} style={{ marginLeft: 'auto' }} />}
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </ScrollView>
+                      </View>
+                    )}
+                  </View>
                 </View>
               </View>
 
@@ -340,8 +357,6 @@ export const CreateLobbyModal = ({ isVisible, onClose }: CreateLobbyModalProps) 
                 </TouchableOpacity>
               </View>
             </ScrollView>
-          )}
-
           </TouchableOpacity>
         </Animated.View>
       </TouchableOpacity>
@@ -384,57 +399,64 @@ const styles = StyleSheet.create({
   },
   closeButton: { padding: 4 },
 
-  // ---- Rank Picker Overlay (in-card) ----
-  rankPickerOverlay: {
-    flex: 1,
-    minHeight: 300,
+  // ---- Rank Picker Styles (Dropdown) ----
+  modalBackdrop: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'transparent',
+    zIndex: 10,
   },
-  pickerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.06)',
-  },
-  pickerTitle: {
-    color: Colors.text,
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  rankOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
+  lobbyRankDropdown: {
+    position: 'absolute',
+    top: 45,
+    left: 0,
+    right: 0,
+    maxHeight: 200,
+    backgroundColor: Colors.surface,
     borderRadius: 8,
-    backgroundColor: Colors.background,
-    gap: 12,
-    marginBottom: 6,
-  },
-  rankOptionSelected: {
-    backgroundColor: 'rgba(0, 255, 135, 0.08)',
     borderWidth: 1,
-    borderColor: Colors.primary,
+    borderColor: 'rgba(255,255,255,0.08)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 5,
+    overflow: 'hidden',
+    zIndex: 1000,
   },
-  rankOptionIcon: {
-    width: 28,
-    height: 28,
+  lobbyRankDropdownScroll: {
+    maxHeight: 198,
+  },
+  lobbyRankOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 10,
+    backgroundColor: Colors.surface,
+  },
+  lobbyRankOptionSelected: {
+    backgroundColor: 'rgba(0, 255, 135, 0.05)',
+  },
+  lobbyRankOptionDisabled: {
+    opacity: 0.3,
+  },
+  lobbyRankOptionIcon: {
+    width: 24,
+    height: 24,
     resizeMode: 'contain',
   },
-  rankOptionText: {
+  lobbyRankOptionText: {
     color: Colors.gray,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-    flex: 1,
   },
-  rankOptionTextSelected: { color: Colors.primary },
-  rankOptionDisabled: {
-    opacity: 0.4,
-    backgroundColor: 'rgba(255,255,255,0.02)',
-  },
-  rankOptionTextDisabled: {
-    color: 'rgba(255,255,255,0.2)',
+  lobbyRankOptionTextSelected: {
+    color: Colors.primary,
+    fontWeight: '700',
   },
 
   // ---- Form styles ----

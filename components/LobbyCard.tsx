@@ -8,6 +8,7 @@ import { collection, addDoc, serverTimestamp, doc, getDoc, deleteDoc, query, whe
 import { ReportModal } from '@/components/ReportModal';
 import { useRouter } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
+import SpotlightCard from './SpotlightCard';
 
 interface LobbyCardProps {
   lobbyId: string;
@@ -285,50 +286,51 @@ export const LobbyCard = ({
     return (
       <Animated.View 
         entering={FadeInDown.duration(400).delay(Math.min((index || 0) * 80, 600))}
-        style={styles.webCard}
       >
-        <TouchableOpacity 
-          style={styles.webLeft}
-          onPress={() => {
-            router.push({ pathname: '/profile', params: { targetUserId: creatorId } });
-          }}
-        >
-          <View style={styles.avatarPlaceholderSmall}>
-            {creatorPhoto ? (
-              <Image
-                source={{ uri: `data:image/jpeg;base64,${creatorPhoto}` }}
-                style={styles.avatarSmall}
-              />
-            ) : (
-              <Ionicons name="person" size={18} color={Colors.gray} />
-            )}
-          </View>
-          <View>
-            <Text style={styles.webIdText}>{creatorName}</Text>
-            <Text style={styles.webRatingText}>⭐ {rating}</Text>
-          </View>
-        </TouchableOpacity>
-
-        <View style={styles.webCenterLeft}>
-          <View style={styles.row}>
-            <View style={styles.webModeBadge}>
-              <Text style={styles.webModeText}>{gameMode}</Text>
+        <SpotlightCard style={styles.webCard as any}>
+          <TouchableOpacity 
+            style={styles.webLeft}
+            onPress={() => {
+              router.push({ pathname: '/profile', params: { targetUserId: creatorId } });
+            }}
+          >
+            <View style={styles.avatarPlaceholderSmall}>
+              {creatorPhoto ? (
+                <Image
+                  source={{ uri: `data:image/jpeg;base64,${creatorPhoto}` }}
+                  style={styles.avatarSmall}
+                />
+              ) : (
+                <Ionicons name="person" size={18} color={Colors.gray} />
+              )}
             </View>
-            <View style={styles.missingBadgeSmall}>
-              <Text style={styles.missingTextSmall}>{missingPlayers}</Text>
+            <View>
+              <Text style={styles.webIdText}>{creatorName}</Text>
+              <Text style={styles.webRatingText}>⭐ {rating}</Text>
             </View>
-            <Text style={styles.webRoleText}>{roleInfo}</Text>
+          </TouchableOpacity>
+
+          <View style={styles.webCenterLeft}>
+            <View style={styles.row}>
+              <View style={styles.webModeBadge}>
+                <Text style={styles.webModeText}>{gameMode}</Text>
+              </View>
+              <View style={styles.missingBadgeSmall}>
+                <Text style={styles.missingTextSmall}>{missingPlayers}</Text>
+              </View>
+              <Text style={styles.webRoleText}>{roleInfo}</Text>
+            </View>
+            {!!description && <Text style={styles.descriptionText} numberOfLines={1}>{description}</Text>}
           </View>
-          {!!description && <Text style={styles.descriptionText} numberOfLines={1}>{description}</Text>}
-        </View>
 
-        <View style={styles.webCenterRight}>
-          <RankDisplay />
-        </View>
+          <View style={styles.webCenterRight}>
+            <RankDisplay />
+          </View>
 
-        <View style={styles.webRight}>
-          {renderActionButton()}
-        </View>
+          <View style={styles.webRight}>
+            {renderActionButton()}
+          </View>
+        </SpotlightCard>
       </Animated.View>
     );
   }

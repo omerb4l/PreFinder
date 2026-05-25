@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, Platform, useWindowDimensions, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, Platform, useWindowDimensions, ActivityIndicator, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Colors, getThemeMode, subscribeTheme } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { VALORANT_RANKS } from '@/constants/ranks';
 import { auth, db } from '@/firebaseConfig';
-import { doc, onSnapshot, collection, query, where, getDocs, getDoc } from 'firebase/firestore';
+import { doc, onSnapshot, collection, query, where, getDocs, getDoc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { EditProfileModal } from '@/components/EditProfileModal';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -48,14 +48,20 @@ export default function ProfileScreen() {
   const [loadingReviews, setLoadingReviews] = useState(false);
   const [calculatedAverage, setCalculatedAverage] = useState<number | null>(null);
 
-  // Tabs states
+  // Profile primary tab state
+  const [profileTab, setProfileTab] = useState<'genel' | 'matches'>('genel');
+
+  // Sub-tabs states (Inside "Genel" tab)
   const [activeTab, setActiveTab] = useState<'reviews' | 'posts' | 'comments'>('reviews');
   const [userPosts, setUserPosts] = useState<any[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [userComments, setUserComments] = useState<any[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
 
-
+  // Match History states
+  const [matches, setMatches] = useState<any[]>([]);
+  const [loadingMatches, setLoadingMatches] = useState(false);
+  const [ratingStates, setRatingStates] = useState<Record<string, { rating: number; note: string; submitting: boolean }>>({});
 
   // 1. Listen for user document changes
   useEffect(() => {
@@ -85,14 +91,12 @@ export default function ProfileScreen() {
     const fetchReviews = async () => {
       setLoadingReviews(true);
       try {
-        // Query 1: Target user is player, leader gave rating
         const q1 = query(
           collection(db, 'match_history'),
           where('playerId', '==', displayUserId),
           where('leaderRated', '==', true)
         );
 
-        // Query 2: Target user is leader, player gave rating
         const q2 = query(
           collection(db, 'match_history'),
           where('leaderId', '==', displayUserId),
@@ -129,14 +133,12 @@ export default function ProfileScreen() {
           }
         });
 
-        // Sort by timestamp descending
         rawReviews.sort((a, b) => {
           const tA = a.timestamp?.toMillis() || 0;
           const tB = b.timestamp?.toMillis() || 0;
           return tB - tA;
         });
 
-        // Enrich reviewer names and photos
         const enrichedReviewsPromises = rawReviews.map(async (rev) => {
           let reviewerName = 'Bilinmeyen Oyuncu';
           let reviewerPhoto = null;
@@ -162,7 +164,6 @@ export default function ProfileScreen() {
         const enrichedReviews = await Promise.all(enrichedReviewsPromises);
         setReviews(enrichedReviews);
 
-        // Calculate actual average rating
         if (enrichedReviews.length > 0) {
           const total = enrichedReviews.reduce((sum, r) => sum + r.rating, 0);
           setCalculatedAverage(parseFloat((total / enrichedReviews.length).toFixed(1)));
@@ -196,7 +197,6 @@ export default function ProfileScreen() {
           fetchedPosts.push({ id: docSnap.id, ...docSnap.data() });
         });
 
-        // Sort client-side by createdAt descending
         fetchedPosts.sort((a, b) => {
           const tA = a.createdAt?.toMillis ? a.createdAt.toMillis() : (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0);
           const tB = b.createdAt?.toMillis ? b.createdAt.toMillis() : (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0);
@@ -230,14 +230,12 @@ export default function ProfileScreen() {
           rawComments.push({ id: docSnap.id, ...docSnap.data() });
         });
 
-        // Sort client-side by createdAt descending
         rawComments.sort((a, b) => {
           const tA = a.createdAt?.toMillis ? a.createdAt.toMillis() : (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0);
           const tB = b.createdAt?.toMillis ? b.createdAt.toMillis() : (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0);
           return tB - tA;
         });
 
-        // Fetch parent post title for each comment to make it look premium
         const enrichedCommentsPromises = rawComments.slice(0, 20).map(async (comm) => {
           let postTitle = 'Silinmiş Konu';
           try {
@@ -266,6 +264,221 @@ export default function ProfileScreen() {
     fetchUserComments();
   }, [displayUserId]);
 
+  // 5. Fetch Match History when tab selected
+  useEffect(() => {
+    if (profileTab === 'matches') {
+      fetchMatchHistory();
+    }
+  }, [profileTab, displayUserId]);
+
+  const fetchMatchHistory = async () => {
+    if (!displayUserId) return;
+    setLoadingMatches(true);
+    try {
+      const qLeader = query(
+        collection(db, 'match_history'),
+        where('leaderId', '==', displayUserId)
+      );
+
+      const qPlayer = query(
+        collection(db, 'match_history'),
+        where('playerId', '==', displayUserId)
+      );
+
+      const [snapLeader, snapPlayer] = await Promise.all([
+        getDocs(qLeader),
+        getDocs(qPlayer)
+      ]);
+
+      const rawMatches: any[] = [];
+      snapLeader.forEach((doc) => {
+        rawMatches.push({ id: doc.id, ...doc.data() });
+      });
+      snapPlayer.forEach((doc) => {
+        if (!rawMatches.some(m => m.id === doc.id)) {
+          rawMatches.push({ id: doc.id, ...doc.data() });
+        }
+      });
+
+      rawMatches.sort((a, b) => {
+        const tA = a.timestamp?.toMillis() || 0;
+        const tB = b.timestamp?.toMillis() || 0;
+        return tB - tA;
+      });
+
+      const enrichedMatchesPromises = rawMatches.map(async (match) => {
+        const teammateId = displayUserId === match.leaderId ? match.playerId : match.leaderId;
+        let teammateName = 'Bilinmeyen Oyuncu';
+        let teammatePhoto = null;
+        let teammateRiotId = '';
+
+        try {
+          const teammateRef = doc(db, 'users', teammateId);
+          const teammateSnap = await getDoc(teammateRef);
+          if (teammateSnap.exists()) {
+            const data = teammateSnap.data();
+            teammateName = data.username || 'Bilinmeyen Oyuncu';
+            teammatePhoto = data.profilePicBase64 || null;
+            teammateRiotId = data.riotId || '';
+          }
+        } catch (err) {
+          console.warn('Error fetching teammate profile:', err);
+        }
+
+        const matchTime = match.timestamp?.toMillis() || Date.now();
+        const isExpired = Date.now() - matchTime > 24 * 60 * 60 * 1000;
+        const loggedInUser = auth.currentUser?.uid;
+        const alreadyRated = loggedInUser === match.leaderId ? match.leaderRated : match.playerRated;
+
+        return {
+          ...match,
+          teammateId,
+          teammateName,
+          teammatePhoto,
+          teammateRiotId,
+          isExpired,
+          alreadyRated
+        };
+      });
+
+      const enrichedMatches = await Promise.all(enrichedMatchesPromises);
+      setMatches(enrichedMatches);
+
+      const initialStates: typeof ratingStates = {};
+      enrichedMatches.forEach(m => {
+        const loggedInUser = auth.currentUser?.uid;
+        const alreadyRated = loggedInUser === m.leaderId ? m.leaderRated : m.playerRated;
+        if (!alreadyRated && !m.isExpired && isOwnProfile) {
+          initialStates[m.id] = { rating: 5, note: '', submitting: false };
+        }
+      });
+      setRatingStates(initialStates);
+    } catch (err) {
+      console.error('Error fetching match history:', err);
+    } finally {
+      setLoadingMatches(false);
+    }
+  };
+
+  const handleRateTeammate = async (matchId: string) => {
+    const user = auth.currentUser;
+    const state = ratingStates[matchId];
+    if (!user || !state || state.submitting) return;
+
+    setRatingStates(prev => ({
+      ...prev,
+      [matchId]: { ...prev[matchId], submitting: true }
+    }));
+
+    try {
+      const match = matches.find(m => m.id === matchId);
+      if (!match) return;
+
+      const isLeader = user.uid === match.leaderId;
+      const teammateId = match.teammateId;
+
+      const matchRef = doc(db, 'match_history', matchId);
+      if (isLeader) {
+        await updateDoc(matchRef, {
+          leaderRated: true,
+          leaderRating: state.rating,
+          leaderNote: state.note.trim()
+        });
+      } else {
+        await updateDoc(matchRef, {
+          playerRated: true,
+          playerRating: state.rating,
+          playerNote: state.note.trim()
+        });
+      }
+
+      const teammateRef = doc(db, 'users', teammateId);
+      const teammateSnap = await getDoc(teammateRef);
+
+      if (teammateSnap.exists()) {
+        const tData = teammateSnap.data();
+        const currentCount = tData.ratingCount || 0;
+        const currentRating = tData.rating || 5.0;
+        const newCount = currentCount + 1;
+        const newRating = ((currentRating * currentCount + state.rating) / newCount).toFixed(1);
+
+        await updateDoc(teammateRef, {
+          rating: parseFloat(newRating),
+          ratingCount: newCount
+        });
+      }
+
+      const trimmedNote = state.note.trim();
+      const isNegativeText = trimmedNote.toLowerCase().includes('toksik') || 
+                            trimmedNote.toLowerCase().includes('küfür') || 
+                            trimmedNote.toLowerCase().includes('troll') || 
+                            trimmedNote.toLowerCase().includes('feed');
+
+      if (state.rating <= 2 || isNegativeText) {
+        await addDoc(collection(db, 'reports'), {
+          reporterId: user.uid,
+          reportedRiotId: match.teammateRiotId || match.teammateName,
+          reason: state.rating <= 2 ? "Düşük Puanlı Oyuncu Değerlendirmesi" : "Değerlendirme Şikayeti (Yazılı)",
+          description: trimmedNote || `${state.rating} Yıldız Değerlendirmesi`,
+          videoLink: "",
+          evidenceImageBase64: null,
+          status: 'pending',
+          timestamp: serverTimestamp(),
+        });
+      }
+
+      if (Platform.OS === 'web') {
+        window.alert('Değerlendirmeniz başarıyla kaydedildi.');
+      } else {
+        Alert.alert('Başarılı', 'Değerlendirmeniz başarıyla kaydedildi.');
+      }
+
+      setMatches(prev => prev.map(m => m.id === matchId ? { ...m, alreadyRated: true } : m));
+
+    } catch (error) {
+      console.error('Error submitting teammate rating:', error);
+      if (Platform.OS === 'web') {
+        window.alert('Değerlendirme kaydedilirken bir hata oluştu.');
+      } else {
+        Alert.alert('Hata', 'Değerlendirme kaydedilirken bir hata oluştu.');
+      }
+    } finally {
+      setRatingStates(prev => ({
+        ...prev,
+        [matchId]: { ...prev[matchId], submitting: false }
+      }));
+    }
+  };
+
+  const handleStarSelect = (matchId: string, starRating: number) => {
+    setRatingStates(prev => ({
+      ...prev,
+      [matchId]: { ...prev[matchId], rating: starRating }
+    }));
+  };
+
+  const handleNoteChange = (matchId: string, text: string) => {
+    setRatingStates(prev => ({
+      ...prev,
+      [matchId]: { ...prev[matchId], note: text }
+    }));
+  };
+
+  const getRankColor = (rank: string) => {
+    if (!rank) return '#00FF87';
+    const r = rank.toLowerCase();
+    if (r.includes('iron') || r.includes('demir')) return '#7d7d7d';
+    if (r.includes('bronze') || r.includes('bronz')) return '#A47046';
+    if (r.includes('silver') || r.includes('gümüş')) return '#BAC4C4';
+    if (r.includes('gold') || r.includes('altın')) return '#E5C554';
+    if (r.includes('platinum') || r.includes('platin')) return '#4ABBB3';
+    if (r.includes('diamond') || r.includes('elmas')) return '#AD71F5';
+    if (r.includes('ascendant') || r.includes('yücelik')) return '#149E69';
+    if (r.includes('immortal') || r.includes('ölümsüz')) return '#B73D54';
+    if (r.includes('radiant') || r.includes('radyant')) return '#FFAA00';
+    return '#00FF87';
+  };
+
   if (loading) {
     return (
       <View style={[styles.safeArea, { justifyContent: 'center', alignItems: 'center' }]}>
@@ -282,7 +495,6 @@ export default function ProfileScreen() {
     );
   }
 
-  // Generate stars JSX helper
   const renderStarIcons = (score: number) => {
     const stars = [];
     const rounded = Math.round(score);
@@ -299,10 +511,20 @@ export default function ProfileScreen() {
     return stars;
   };
 
+  const rankColor = getRankColor(userData.rank);
+
   return (
-    <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
+    <SafeAreaView 
+      style={[
+        styles.safeArea,
+        Platform.OS === 'web' && {
+          backgroundImage: 'linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px)',
+          backgroundSize: '30px 30px',
+        } as any
+      ]} 
+      edges={['left', 'right', 'bottom']}
+    >
       
-      {/* Back button header (only if viewing someone else's profile) */}
       {!isOwnProfile && (
         <View style={styles.topHeader}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -319,187 +541,398 @@ export default function ProfileScreen() {
       >
         {/* Profile Header Card */}
         <View style={styles.profileHeaderCard}>
-          <View style={styles.avatarContainer}>
-            <View style={styles.avatarLarge}>
-              {userData.profilePicBase64 ? (
-                <Image 
-                  source={{ uri: `data:image/jpeg;base64,${userData.profilePicBase64}` }} 
-                  style={styles.avatarImage} 
-                />
-              ) : (
-                <Ionicons name="person" size={50} color={Colors.gray} />
-              )}
-            </View>
-          </View>
-          
-          <Text style={styles.riotId}>{userData.riotId || userData.username}</Text>
-          
-          {/* Rating display: Prominently show star rating with click details */}
-          <View style={styles.ratingRow}>
-            {calculatedAverage !== null ? (
-              <>
-                <View style={styles.starRow}>
-                  {renderStarIcons(calculatedAverage)}
-                </View>
-                <Text style={styles.ratingText}>
-                  {calculatedAverage} ({reviews.length} Değerlendirme)
-                </Text>
-              </>
-            ) : (
-              <>
-                <Ionicons name="star" size={16} color="#FFD700" />
-                <Text style={styles.ratingText}>
-                  {userData.rating || '0.0'} / 5.0 (Oylanmadı)
-                </Text>
-              </>
-            )}
-          </View>
-
-          {/* User statistics details */}
-          <View style={styles.statsContainer}>
-            <View style={styles.statBox}>
-              <Text style={styles.statNumber}>{userData.lobbiesCreated || 0}</Text>
-              <Text style={styles.statLabel}>Açılan Lobi</Text>
-            </View>
-            <View style={styles.statsDivider} />
-            <View style={styles.statBox}>
-              <Text style={styles.statNumber}>{userData.lobbiesJoined || 0}</Text>
-              <Text style={styles.statLabel}>Katılınan Lobi</Text>
-            </View>
-          </View>
-
-          <View style={styles.rankAgentRow}>
-            {userData.rank && VALORANT_RANKS[userData.rank as keyof typeof VALORANT_RANKS] ? (
-              <View style={styles.rankBox}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Image source={VALORANT_RANKS[userData.rank as keyof typeof VALORANT_RANKS].icon} style={styles.rankIcon} />
-                  {userData.verificationStatus === 'verified' && (
-                    <Ionicons name="checkmark-circle" size={16} color="#00FF87" />
-                  )}
-                </View>
-                <Text style={styles.rankName}>{VALORANT_RANKS[userData.rank as keyof typeof VALORANT_RANKS].name}</Text>
-              </View>
-            ) : (
-              <View style={styles.rankBox}>
-                <Ionicons name="trophy-outline" size={32} color={Colors.gray} />
-                <Text style={styles.rankName}>Rank Belirlenmedi</Text>
-              </View>
-            )}
+          <View style={[styles.headerTopRow, !isWeb && { flexDirection: 'column', alignItems: 'center' }]}>
             
-            <View style={styles.agentsList}>
-              {userData.mainAgents && userData.mainAgents.length > 0 ? (
-                userData.mainAgents.map((agent: string) => (
-                  <View key={agent} style={styles.agentBadge}>
-                    <Text style={styles.agentBadgeText}>{agent}</Text>
+            {/* Avatar container */}
+            <View style={styles.avatarWrapperContainer}>
+              <View style={[styles.avatarLarge, { borderColor: rankColor, shadowColor: rankColor }]}>
+                {userData.profilePicBase64 ? (
+                  <Image 
+                    source={{ uri: `data:image/jpeg;base64,${userData.profilePicBase64}` }} 
+                    style={styles.avatarImage} 
+                  />
+                ) : (
+                  <Ionicons name="person" size={44} color={Colors.gray} />
+                )}
+              </View>
+              {/* Online/Active indicator dot */}
+              <View style={[styles.onlineDot, { backgroundColor: '#00FF87' }]} />
+            </View>
+
+            {/* Info Container */}
+            <View style={[styles.profileInfoRight, !isWeb && { alignItems: 'center', marginTop: 16 }]}>
+              <Text style={[styles.riotId, !isWeb && { textAlign: 'center' }]}>
+                {userData.riotId || userData.username}
+              </Text>
+              
+              <Text style={[styles.bioTextHeader, !isWeb && { textAlign: 'center' }]} numberOfLines={3}>
+                {userData.bio || 'Henüz bir biyografi eklenmemiş.'}
+              </Text>
+
+              <View style={styles.badgeRow}>
+                {/* Star Rating Badge */}
+                <View style={styles.ratingBadge}>
+                  <Ionicons name="star" size={14} color="#FFD700" style={{ marginRight: 2 }} />
+                  <Text style={styles.ratingBadgeText}>
+                    {calculatedAverage !== null ? `${calculatedAverage} (${reviews.length})` : `${userData.rating || '0.0'}`}
+                  </Text>
+                </View>
+
+                {/* Verified Rank Badge */}
+                {userData.verificationStatus === 'verified' && (
+                  <View style={styles.verifiedBadge}>
+                    <Ionicons name="shield-checkmark" size={14} color="#00FF87" style={{ marginRight: 2 }} />
+                    <Text style={styles.verifiedBadgeText}>Doğrulandı</Text>
                   </View>
-                ))
-              ) : (
-                <Text style={{ color: Colors.gray, fontSize: 12 }}>Ajan seçilmedi</Text>
-              )}
+                )}
+              </View>
             </View>
           </View>
 
-          {/* Rank Verification Status Row */}
-          {isOwnProfile && userData?.verificationStatus && (
-            <View style={styles.verificationContainer}>
-              {userData.verificationStatus === 'pending' ? (
-                <View style={styles.pendingBadge}>
-                  <Ionicons name="time" size={16} color="#FFB300" />
-                  <Text style={styles.pendingText}>Rütbe onayınız beklemede...</Text>
-                </View>
-              ) : userData.verificationStatus === 'verified' ? (
-                <View style={styles.verifiedBadge}>
-                  <Ionicons name="checkmark-circle" size={16} color="#00FF87" />
-                  <Text style={styles.verifiedText}>Rütbeniz Doğrulandı</Text>
-                </View>
-              ) : userData.verificationStatus === 'rejected' ? (
-                <View style={[styles.pendingBadge, { backgroundColor: 'rgba(255, 70, 85, 0.1)', borderColor: 'rgba(255, 70, 85, 0.2)' }]}>
-                  <Ionicons name="close-circle" size={16} color={Colors.danger} />
-                  <Text style={[styles.pendingText, { color: Colors.danger }]}>Rütbe onayınız reddedildi.</Text>
-                </View>
-              ) : null}
-            </View>
-          )}
+          <View style={styles.headerDivider} />
 
-          <View style={styles.bioBox}>
-            <Text style={styles.bioText}>{userData.bio || 'Henüz bir biyografi eklenmemiş.'}</Text>
-          </View>
-
-          {/* Action buttons (only shown for owner profile) */}
-          {isOwnProfile && (
-            <>
-              <View style={{ height: 24 }} />
-              <PrimaryButton 
-                title="Profili Düzenle" 
-                onPress={() => setIsEditModalVisible(true)} 
-              />
-
+          {/* Tab Navigation inside the main Header Card */}
+          <View style={styles.headerTabsContainer}>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.headerTabsScroll}
+            >
               <TouchableOpacity 
-                style={styles.historyBtn} 
-                onPress={() => router.push('/previous-players')}
+                style={[styles.headerTabButton, profileTab === 'genel' && styles.headerTabButtonActive]}
+                onPress={() => setProfileTab('genel')}
               >
-                <Ionicons name="time-outline" size={20} color={Colors.primary} />
-                <Text style={styles.historyBtnText}>Geçmiş Karşılaşmalar</Text>
+                <Text style={[styles.headerTabButtonText, profileTab === 'genel' && styles.headerTabButtonTextActive]}>
+                  Genel
+                </Text>
               </TouchableOpacity>
 
-              {userData.role === 'admin' && (
+              <TouchableOpacity 
+                style={[styles.headerTabButton, profileTab === 'matches' && styles.headerTabButtonActive]}
+                onPress={() => setProfileTab('matches')}
+              >
+                <Text style={[styles.headerTabButtonText, profileTab === 'matches' && styles.headerTabButtonTextActive]}>
+                  Geçmiş Karşılaşmalar
+                </Text>
+              </TouchableOpacity>
+
+              {isOwnProfile && (
                 <TouchableOpacity 
-                  style={styles.adminBtn} 
-                  onPress={() => router.push('/admin')}
+                  style={styles.headerTabButton}
+                  onPress={() => setIsEditModalVisible(true)}
                 >
-                  <Ionicons name="shield-half" size={20} color={Colors.primary} />
-                  <Text style={styles.adminBtnText}>Yönetim Paneli</Text>
+                  <Text style={styles.headerTabButtonText}>
+                    Profili Düzenle
+                  </Text>
                 </TouchableOpacity>
               )}
-            </>
-          )}
+
+              {isOwnProfile && userData.role === 'admin' && (
+                <TouchableOpacity 
+                  style={styles.headerTabButton}
+                  onPress={() => router.push('/admin')}
+                >
+                  <Text style={styles.headerTabButtonText}>
+                    Yönetim Paneli
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </ScrollView>
+          </View>
         </View>
 
-        {/* Tab Switcher */}
-        <View style={styles.tabsContainer}>
-          <AnimatedTouchable 
-            style={[styles.tabButton, activeTab === 'reviews' && styles.tabButtonActive]}
-            onPress={() => setActiveTab('reviews')}
-          >
-            <Text style={[styles.tabButtonText, activeTab === 'reviews' && styles.tabButtonTextActive]}>
-              Değerlendirmeler ({reviews.length})
-            </Text>
-          </AnimatedTouchable>
+        {/* TAB CONTENT: GENEL */}
+        {profileTab === 'genel' && (
+          <>
+            {/* Modular Cards Row */}
+            <View style={[styles.modularCardsRow, isWeb && styles.webModularCardsRow]}>
+              
+              {/* Card A: Stats Card */}
+              <View style={[styles.modularCard, isWeb && styles.webModularCard]}>
+                <Text style={styles.cardTitle}>Karşılaşma İstatistikleri</Text>
+                <View style={styles.statsRow}>
+                  <View style={styles.statDataBox}>
+                    <Text style={styles.statDataNumber}>{userData.lobbiesCreated || 0}</Text>
+                    <Text style={styles.statDataLabel}>Açılan Lobi</Text>
+                  </View>
+                  <View style={styles.statDataBox}>
+                    <Text style={styles.statDataNumber}>{userData.lobbiesJoined || 0}</Text>
+                    <Text style={styles.statDataLabel}>Katılınan Lobi</Text>
+                  </View>
+                </View>
+              </View>
 
-          <AnimatedTouchable 
-            style={[styles.tabButton, activeTab === 'posts' && styles.tabButtonActive]}
-            onPress={() => setActiveTab('posts')}
-          >
-            <Text style={[styles.tabButtonText, activeTab === 'posts' && styles.tabButtonTextActive]}>
-              Konular ({userPosts.length})
-            </Text>
-          </AnimatedTouchable>
+              {/* Card B: Rank & Roles Card */}
+              <View style={[styles.modularCard, isWeb && styles.webModularCard]}>
+                <Text style={styles.cardTitle}>Rütbe ve Roller</Text>
+                <View style={styles.rankRoleRow}>
+                  
+                  {userData.rank && VALORANT_RANKS[userData.rank as keyof typeof VALORANT_RANKS] ? (
+                    <View style={styles.rankContainerInfo}>
+                      <Image 
+                        source={VALORANT_RANKS[userData.rank as keyof typeof VALORANT_RANKS].icon} 
+                        style={styles.rankIconDetail} 
+                      />
+                      <Text style={styles.rankNameDetail}>
+                        {VALORANT_RANKS[userData.rank as keyof typeof VALORANT_RANKS].name}
+                      </Text>
+                    </View>
+                  ) : (
+                    <View style={styles.rankContainerInfo}>
+                      <Ionicons name="trophy-outline" size={32} color={Colors.gray} />
+                      <Text style={styles.rankNameDetail}>Derecesiz</Text>
+                    </View>
+                  )}
 
-          <AnimatedTouchable 
-            style={[styles.tabButton, activeTab === 'comments' && styles.tabButtonActive]}
-            onPress={() => setActiveTab('comments')}
-          >
-            <Text style={[styles.tabButtonText, activeTab === 'comments' && styles.tabButtonTextActive]}>
-              Yanıtlar ({userComments.length})
-            </Text>
-          </AnimatedTouchable>
-        </View>
+                  <View style={styles.rolesDivider} />
 
-        {activeTab === 'reviews' && (
+                  <View style={styles.rolesList}>
+                    {userData.mainAgents && userData.mainAgents.length > 0 ? (
+                      userData.mainAgents.map((agent: string) => (
+                        <View key={agent} style={styles.agentBadgeDetail}>
+                          <Text style={styles.agentBadgeTextDetail}>{agent}</Text>
+                        </View>
+                      ))
+                    ) : (
+                      <Text style={{ color: Colors.gray, fontSize: 12 }}>Ajan seçilmedi</Text>
+                    )}
+                  </View>
+                </View>
+
+                {/* Rank Verification Status Row inside modular card */}
+                {isOwnProfile && userData?.verificationStatus && (
+                  <View style={styles.verificationContainer}>
+                    {userData.verificationStatus === 'pending' ? (
+                      <View style={styles.pendingBadge}>
+                        <Ionicons name="time" size={14} color="#FFB300" style={{ marginRight: 4 }} />
+                        <Text style={styles.pendingText}>Rütbe onayınız beklemede...</Text>
+                      </View>
+                    ) : userData.verificationStatus === 'verified' ? (
+                      <View style={styles.verifiedBadgeDetail}>
+                        <Ionicons name="checkmark-circle" size={14} color="#00FF87" style={{ marginRight: 4 }} />
+                        <Text style={styles.verifiedText}>Rütbeniz Doğrulandı</Text>
+                      </View>
+                    ) : userData.verificationStatus === 'rejected' ? (
+                      <View style={[styles.pendingBadge, { backgroundColor: 'rgba(255, 70, 85, 0.1)', borderColor: 'rgba(255, 70, 85, 0.2)' }]}>
+                        <Ionicons name="close-circle" size={14} color={Colors.danger} style={{ marginRight: 4 }} />
+                        <Text style={[styles.pendingText, { color: Colors.danger }]}>Rütbe onayınız reddedildi.</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                )}
+              </View>
+            </View>
+
+            {/* Sub-tab view (Değerlendirmeler, Konular, Yanıtlar) */}
+            <View style={styles.tabsContainer}>
+              <AnimatedTouchable 
+                style={[styles.tabButton, activeTab === 'reviews' && styles.tabButtonActive]}
+                onPress={() => setActiveTab('reviews')}
+              >
+                <Text style={[styles.tabButtonText, activeTab === 'reviews' && styles.tabButtonTextActive]}>
+                  Değerlendirmeler ({reviews.length})
+                </Text>
+              </AnimatedTouchable>
+
+              <AnimatedTouchable 
+                style={[styles.tabButton, activeTab === 'posts' && styles.tabButtonActive]}
+                onPress={() => setActiveTab('posts')}
+              >
+                <Text style={[styles.tabButtonText, activeTab === 'posts' && styles.tabButtonTextActive]}>
+                  Konular ({userPosts.length})
+                </Text>
+              </AnimatedTouchable>
+
+              <AnimatedTouchable 
+                style={[styles.tabButton, activeTab === 'comments' && styles.tabButtonActive]}
+                onPress={() => setActiveTab('comments')}
+              >
+                <Text style={[styles.tabButtonText, activeTab === 'comments' && styles.tabButtonTextActive]}>
+                  Yanıtlar ({userComments.length})
+                </Text>
+              </AnimatedTouchable>
+            </View>
+
+            {activeTab === 'reviews' && (
+              <View style={styles.reviewsSection}>
+                <Text style={styles.reviewsTitle}>Oyuncu Yorumları ({reviews.length})</Text>
+
+                {loadingReviews ? (
+                  <ActivityIndicator size="small" color={Colors.primary} style={{ marginTop: 20 }} />
+                ) : reviews.length === 0 ? (
+                  <View style={styles.emptyReviews}>
+                    <Ionicons name="chatbox-ellipses-outline" size={32} color={Colors.gray} />
+                    <Text style={styles.emptyReviewsText}>Bu oyuncu hakkında henüz yazılı bir yorum yapılmamış.</Text>
+                  </View>
+                ) : (
+                  reviews.map((item, index) => {
+                    const dateStr = item.timestamp?.toDate()
+                      ? item.timestamp.toDate().toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                      : 'Bilinmiyor';
+
+                    return (
+                      <Animated.View
+                        key={item.id}
+                        entering={FadeInDown.duration(400).delay(Math.min(index * 80, 600))}
+                      >
+                        <View style={styles.reviewCard}>
+                          <View style={styles.reviewHeader}>
+                            <View style={styles.reviewerInfo}>
+                              <View style={styles.reviewerAvatarWrapper}>
+                                {item.reviewerPhoto ? (
+                                  <Image 
+                                    source={{ uri: `data:image/jpeg;base64,${item.reviewerPhoto}` }} 
+                                    style={styles.reviewerAvatar} 
+                                  />
+                                ) : (
+                                  <Ionicons name="person" size={12} color={Colors.gray} />
+                                )}
+                              </View>
+                              <Text style={styles.reviewerName}>{item.reviewerName}</Text>
+                            </View>
+                            <Text style={styles.reviewDate}>{dateStr}</Text>
+                          </View>
+
+                          <View style={styles.reviewRatingRow}>
+                            {renderStarIcons(item.rating)}
+                          </View>
+
+                          <Text style={styles.reviewNote}>
+                            {item.note.trim() || `${item.rating} Yıldızlı Değerlendirme`}
+                          </Text>
+                        </View>
+                      </Animated.View>
+                    );
+                  })
+                )}
+              </View>
+            )}
+
+            {activeTab === 'posts' && (
+              <View style={styles.reviewsSection}>
+                <Text style={styles.reviewsTitle}>Açtığı Konular ({userPosts.length})</Text>
+
+                {loadingPosts ? (
+                  <ActivityIndicator size="small" color={Colors.primary} style={{ marginTop: 20 }} />
+                ) : userPosts.length === 0 ? (
+                  <View style={styles.emptyReviews}>
+                    <Ionicons name="chatbox-outline" size={32} color={Colors.gray} />
+                    <Text style={styles.emptyReviewsText}>Bu oyuncu henüz forum konusu açmamış.</Text>
+                  </View>
+                ) : (
+                  userPosts.map((post, index) => {
+                    const postDateStr = post.createdAt?.toDate()
+                      ? post.createdAt.toDate().toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                      : 'Bilinmiyor';
+
+                    return (
+                      <Animated.View
+                        key={post.id}
+                        entering={FadeInDown.duration(400).delay(Math.min(index * 80, 600))}
+                      >
+                        <AnimatedTouchable 
+                          style={styles.postCardSmall}
+                          onPress={() => router.push({
+                            pathname: '/forum-detail',
+                            params: { postId: post.id }
+                          })}
+                        >
+                          <View style={styles.postCardHeaderSmall}>
+                            <View style={styles.categoryLabel}>
+                              <Text style={styles.categoryLabelText}>{post.category}</Text>
+                            </View>
+                            <Text style={styles.postTimeSmall}>{postDateStr}</Text>
+                          </View>
+                          <Text style={styles.postTitleSmall} numberOfLines={2}>{post.title}</Text>
+                          <Text style={styles.postContentSmall} numberOfLines={3}>{post.content}</Text>
+                          
+                          <View style={styles.postCardFooterSmall}>
+                            <View style={{ flexDirection: 'row', gap: 12 }}>
+                              <View style={styles.interactionBtnSmall}>
+                                <Ionicons name="heart-outline" size={14} color={Colors.gray} />
+                                <Text style={styles.interactionTextSmall}>{post.likesCount || 0} Beğeni</Text>
+                              </View>
+                              <View style={styles.interactionBtnSmall}>
+                                <Ionicons name="chatbubble-outline" size={14} color={Colors.gray} />
+                                <Text style={styles.interactionTextSmall}>{post.commentsCount || 0} Yorum</Text>
+                              </View>
+                            </View>
+                          </View>
+                        </AnimatedTouchable>
+                      </Animated.View>
+                    );
+                  })
+                )}
+              </View>
+            )}
+
+            {activeTab === 'comments' && (
+              <View style={styles.reviewsSection}>
+                <Text style={styles.reviewsTitle}>Yazdığı Yanıtlar ({userComments.length})</Text>
+
+                {loadingComments ? (
+                  <ActivityIndicator size="small" color={Colors.primary} style={{ marginTop: 20 }} />
+                ) : userComments.length === 0 ? (
+                  <View style={styles.emptyReviews}>
+                    <Ionicons name="chatbubbles-outline" size={32} color={Colors.gray} />
+                    <Text style={styles.emptyReviewsText}>Bu oyuncu henüz bir konuya yanıt yazmamış.</Text>
+                  </View>
+                ) : (
+                  userComments.map((comment, index) => {
+                    const commentDateStr = comment.createdAt?.toDate()
+                      ? comment.createdAt.toDate().toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                      : 'Bilinmiyor';
+
+                    return (
+                      <Animated.View
+                        key={comment.id}
+                        entering={FadeInDown.duration(400).delay(Math.min(index * 80, 600))}
+                      >
+                        <AnimatedTouchable 
+                          style={styles.commentCardSmall}
+                          onPress={() => router.push({
+                            pathname: '/forum-detail',
+                            params: { postId: comment.postId }
+                          })}
+                        >
+                          <View style={styles.commentCardHeaderSmall}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1 }}>
+                              <Ionicons name="arrow-undo-outline" size={14} color={Colors.primary} />
+                              <Text style={styles.commentParentTitleSmall} numberOfLines={1}>
+                                Konu: {comment.postTitle}
+                              </Text>
+                            </View>
+                            <Text style={styles.commentTimeSmall}>{commentDateStr}</Text>
+                          </View>
+                          <Text style={styles.commentContentSmall}>{comment.content}</Text>
+                          <Text style={styles.viewThreadText}>Konuyu Görüntüle →</Text>
+                        </AnimatedTouchable>
+                      </Animated.View>
+                    );
+                  })
+                )}
+              </View>
+            )}
+          </>
+        )}
+
+        {/* TAB CONTENT: GEÇMİŞ KARŞILAŞMALAR */}
+        {profileTab === 'matches' && (
           <View style={styles.reviewsSection}>
-            <Text style={styles.reviewsTitle}>Oyuncu Yorumları ({reviews.length})</Text>
+            <Text style={styles.reviewsTitle}>Karşılaşma Geçmişi</Text>
 
-            {loadingReviews ? (
+            {loadingMatches ? (
               <ActivityIndicator size="small" color={Colors.primary} style={{ marginTop: 20 }} />
-            ) : reviews.length === 0 ? (
+            ) : matches.length === 0 ? (
               <View style={styles.emptyReviews}>
-                <Ionicons name="chatbox-ellipses-outline" size={32} color={Colors.gray} />
-                <Text style={styles.emptyReviewsText}>Bu oyuncu hakkında henüz yazılı bir yorum yapılmamış.</Text>
+                <Ionicons name="people-outline" size={36} color={Colors.gray} />
+                <Text style={styles.emptyReviewsText}>Doğrulanmış bir karşılaşma geçmişiniz bulunamadı.</Text>
               </View>
             ) : (
-              reviews.map((item, index) => {
-                const dateStr = item.timestamp?.toDate()
-                  ? item.timestamp.toDate().toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+              matches.map((item, index) => {
+                const state = ratingStates[item.id] || { rating: 5, note: '', submitting: false };
+                const matchDate = item.timestamp?.toDate() 
+                  ? item.timestamp.toDate().toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) 
                   : 'Bilinmiyor';
 
                 return (
@@ -507,138 +940,88 @@ export default function ProfileScreen() {
                     key={item.id}
                     entering={FadeInDown.duration(400).delay(Math.min(index * 80, 600))}
                   >
-                    <View style={styles.reviewCard}>
-                    <View style={styles.reviewHeader}>
-                      <View style={styles.reviewerInfo}>
-                        <View style={styles.reviewerAvatarWrapper}>
-                          {item.reviewerPhoto ? (
-                            <Image 
-                              source={{ uri: `data:image/jpeg;base64,${item.reviewerPhoto}` }} 
-                              style={styles.reviewerAvatar} 
-                            />
-                          ) : (
-                            <Ionicons name="person" size={14} color={Colors.gray} />
-                          )}
-                        </View>
-                        <Text style={styles.reviewerName}>{item.reviewerName}</Text>
-                      </View>
-                      <Text style={styles.reviewDate}>{dateStr}</Text>
-                    </View>
-
-                    <View style={styles.reviewRatingRow}>
-                      {renderStarIcons(item.rating)}
-                    </View>
-
-                    <Text style={styles.reviewNote}>
-                      {item.note.trim() || `${item.rating} Yıldızlı Değerlendirme`}
-                    </Text>
-                  </View>
-                </Animated.View>
-              );
-            })
-            )}
-          </View>
-        )}
-
-        {activeTab === 'posts' && (
-          <View style={styles.reviewsSection}>
-            <Text style={styles.reviewsTitle}>Açtığı Konular ({userPosts.length})</Text>
-
-            {loadingPosts ? (
-              <ActivityIndicator size="small" color={Colors.primary} style={{ marginTop: 20 }} />
-            ) : userPosts.length === 0 ? (
-              <View style={styles.emptyReviews}>
-                <Ionicons name="chatbox-outline" size={32} color={Colors.gray} />
-                <Text style={styles.emptyReviewsText}>Bu oyuncu henüz forum konusu açmamış.</Text>
-              </View>
-            ) : (
-              userPosts.map((post, index) => {
-                const postDateStr = post.createdAt?.toDate()
-                  ? post.createdAt.toDate().toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-                  : 'Bilinmiyor';
-
-                return (
-                  <Animated.View
-                    key={post.id}
-                    entering={FadeInDown.duration(400).delay(Math.min(index * 80, 600))}
-                  >
-                    <AnimatedTouchable 
-                      style={styles.postCardSmall}
-                      onPress={() => router.push({
-                        pathname: '/forum-detail',
-                        params: { postId: post.id }
-                      })}
-                    >
-                    <View style={styles.postCardHeaderSmall}>
-                      <View style={styles.categoryLabel}>
-                        <Text style={styles.categoryLabelText}>{post.category}</Text>
-                      </View>
-                      <Text style={styles.postTimeSmall}>{postDateStr}</Text>
-                    </View>
-                    <Text style={styles.postTitleSmall} numberOfLines={2}>{post.title}</Text>
-                    <Text style={styles.postContentSmall} numberOfLines={3}>{post.content}</Text>
-                    
-                    <View style={styles.postCardFooterSmall}>
-                      <View style={{ flexDirection: 'row', gap: 12 }}>
-                        <View style={styles.interactionBtnSmall}>
-                          <Ionicons name="heart-outline" size={14} color={Colors.gray} />
-                          <Text style={styles.interactionTextSmall}>{post.likesCount || 0} Beğeni</Text>
-                        </View>
-                        <View style={styles.interactionBtnSmall}>
-                          <Ionicons name="chatbubble-outline" size={14} color={Colors.gray} />
-                          <Text style={styles.interactionTextSmall}>{post.commentsCount || 0} Yorum</Text>
+                    <View style={styles.matchCard}>
+                      <View style={styles.matchCardHeader}>
+                        <View style={styles.teammateInfo}>
+                          <View style={styles.teammateAvatarWrapper}>
+                            {item.teammatePhoto ? (
+                              <Image 
+                                source={{ uri: `data:image/jpeg;base64,${item.teammatePhoto}` }} 
+                                style={styles.teammateAvatar} 
+                              />
+                            ) : (
+                              <Ionicons name="person" size={20} color={Colors.gray} />
+                            )}
+                          </View>
+                          <View>
+                            <Text style={styles.teammateName}>{item.teammateRiotId || item.teammateName}</Text>
+                            <Text style={styles.matchDateText}>{matchDate}</Text>
+                          </View>
                         </View>
                       </View>
+
+                      {item.alreadyRated ? (
+                        <View style={styles.feedbackBadgeContainer}>
+                          <Ionicons name="checkmark-circle-outline" size={16} color={Colors.primary} />
+                          <Text style={styles.feedbackBadgeText}>Karşılaşma değerlendirildi.</Text>
+                        </View>
+                      ) : item.isExpired ? (
+                        <View style={styles.feedbackBadgeContainer}>
+                          <Ionicons name="time-outline" size={16} color={Colors.gray} />
+                          <Text style={styles.feedbackExpiredText}>Değerlendirme süresi doldu.</Text>
+                        </View>
+                      ) : isOwnProfile ? (
+                        <View style={styles.ratingFormContainer}>
+                          <Text style={styles.ratingFormLabel}>Oyuncuyu Değerlendirin:</Text>
+                          
+                          <View style={styles.starRatingRow}>
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <TouchableOpacity 
+                                key={star} 
+                                onPress={() => handleStarSelect(item.id, star)}
+                                style={styles.starRatingIcon}
+                              >
+                                <Ionicons 
+                                  name={star <= state.rating ? "star" : "star-outline"} 
+                                  size={24} 
+                                  color={star <= state.rating ? "#FFD700" : Colors.gray} 
+                                />
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+
+                          <TextInput
+                            style={styles.ratingTextInput}
+                            placeholder="Değerlendirme notu (Toksik davrandı, iyi oynadı vb.)..."
+                            placeholderTextColor={Colors.gray}
+                            value={state.note}
+                            onChangeText={(text) => handleNoteChange(item.id, text)}
+                            multiline
+                            maxLength={150}
+                          />
+
+                          <TouchableOpacity 
+                            style={[styles.ratingSubmitBtn, state.rating <= 2 && styles.ratingNegativeSubmitBtn]}
+                            onPress={() => handleRateTeammate(item.id)}
+                            disabled={state.submitting}
+                          >
+                            {state.submitting ? (
+                              <ActivityIndicator size="small" color="#0F1923" />
+                            ) : (
+                              <>
+                                <Ionicons name="shield-checkmark" size={14} color="#0F1923" />
+                                <Text style={styles.ratingSubmitBtnText}>Değerlendir ve Gönder</Text>
+                              </>
+                            )}
+                          </TouchableOpacity>
+                        </View>
+                      ) : (
+                        <View style={styles.feedbackBadgeContainer}>
+                          <Ionicons name="information-circle-outline" size={16} color={Colors.gray} />
+                          <Text style={styles.feedbackExpiredText}>Değerlendirme yetkiniz bulunmamaktadır.</Text>
+                        </View>
+                      )}
                     </View>
-                    </AnimatedTouchable>
-                  </Animated.View>
-                );
-              })
-            )}
-          </View>
-        )}
-
-        {activeTab === 'comments' && (
-          <View style={styles.reviewsSection}>
-            <Text style={styles.reviewsTitle}>Yazdığı Yanıtlar ({userComments.length})</Text>
-
-            {loadingComments ? (
-              <ActivityIndicator size="small" color={Colors.primary} style={{ marginTop: 20 }} />
-            ) : userComments.length === 0 ? (
-              <View style={styles.emptyReviews}>
-                <Ionicons name="chatbubbles-outline" size={32} color={Colors.gray} />
-                <Text style={styles.emptyReviewsText}>Bu oyuncu henüz bir konuya yanıt yazmamış.</Text>
-              </View>
-            ) : (
-              userComments.map((comment, index) => {
-                const commentDateStr = comment.createdAt?.toDate()
-                  ? comment.createdAt.toDate().toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-                  : 'Bilinmiyor';
-
-                return (
-                  <Animated.View
-                    key={comment.id}
-                    entering={FadeInDown.duration(400).delay(Math.min(index * 80, 600))}
-                  >
-                    <AnimatedTouchable 
-                      style={styles.commentCardSmall}
-                      onPress={() => router.push({
-                        pathname: '/forum-detail',
-                        params: { postId: comment.postId }
-                      })}
-                    >
-                    <View style={styles.commentCardHeaderSmall}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1 }}>
-                        <Ionicons name="arrow-undo-outline" size={14} color={Colors.primary} />
-                        <Text style={styles.commentParentTitleSmall} numberOfLines={1}>
-                          Konu: {comment.postTitle}
-                        </Text>
-                      </View>
-                      <Text style={styles.commentTimeSmall}>{commentDateStr}</Text>
-                    </View>
-                    <Text style={styles.commentContentSmall}>{comment.content}</Text>
-                    <Text style={styles.viewThreadText}>Konuyu Görüntüle →</Text>
-                    </AnimatedTouchable>
                   </Animated.View>
                 );
               })
@@ -684,182 +1067,306 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   contentPadding: {
-    padding: 20,
+    padding: 16,
   },
   webContentPadding: {
-    paddingHorizontal: '20%',
-    paddingTop: 40,
+    paddingHorizontal: '15%',
+    paddingTop: 32,
   },
   profileHeaderCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
+    backgroundColor: '#161e2b',
+    borderRadius: 16,
     padding: 24,
-    alignItems: 'center',
     marginBottom: 24,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.02)',
+    borderColor: 'rgba(0, 255, 135, 0.12)',
+    shadowColor: '#00FF87',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 8,
   },
-  avatarContainer: {
+  avatarWrapperContainer: {
     position: 'relative',
-    marginBottom: 16,
+    alignSelf: 'center',
   },
   avatarLarge: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 88,
+    height: 88,
+    borderRadius: 44,
     backgroundColor: '#0F1923',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: Colors.primary,
     overflow: 'hidden',
+    shadowOffset: { width: 0, height: 0 },
+    shadowRadius: 8,
+    shadowOpacity: 0.4,
+    elevation: 6,
   },
   avatarImage: {
     width: '100%',
     height: '100%',
     resizeMode: 'cover',
   },
+  onlineDot: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 2,
+    borderColor: '#161e2b',
+  },
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+  },
+  profileInfoRight: {
+    flex: 1,
+    marginLeft: 20,
+  },
   riotId: {
     color: Colors.text,
     fontSize: 24,
     fontWeight: '900',
-    marginBottom: 8,
+    fontStyle: 'italic',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 16,
-  },
-  starRow: {
-    flexDirection: 'row',
-    gap: 3,
-  },
-  ratingText: {
-    color: Colors.gray,
+  bioTextHeader: {
+    color: 'rgba(255,255,255,0.6)',
     fontSize: 14,
-    fontWeight: '700',
+    marginTop: 4,
+    marginBottom: 12,
+    lineHeight: 18,
   },
-  statsContainer: {
+  badgeRow: {
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'center',
+  },
+  ratingBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.background,
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    marginBottom: 20,
-    width: '100%',
-    maxWidth: 300,
+    backgroundColor: 'rgba(255,215,0,0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    borderColor: 'rgba(255,215,0,0.2)',
+    borderRadius: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
   },
-  statBox: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statNumber: {
-    color: Colors.primary,
-    fontSize: 20,
-    fontWeight: '900',
-    marginBottom: 2,
-  },
-  statLabel: {
-    color: Colors.gray,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  statsDivider: {
-    width: 1,
-    height: 30,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-  },
-  rankAgentRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 24,
-    marginBottom: 20,
-    width: '100%',
-    justifyContent: 'center',
-  },
-  rankBox: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  rankIcon: {
-    width: 40,
-    height: 40,
-    resizeMode: 'contain',
-  },
-  rankName: {
-    color: Colors.text,
+  ratingBadgeText: {
+    color: '#FFD700',
     fontSize: 12,
     fontWeight: '700',
   },
-  agentsList: {
+  verifiedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 255, 135, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 135, 0.2)',
+    borderRadius: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  verifiedBadgeText: {
+    color: '#00FF87',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  headerDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    marginVertical: 18,
+    width: '100%',
+  },
+  headerTabsContainer: {
+    width: '100%',
+  },
+  headerTabsScroll: {
     flexDirection: 'row',
     gap: 8,
   },
-  agentBadge: {
-    backgroundColor: 'rgba(0, 255, 135, 0.1)',
+  headerTabButton: {
+    backgroundColor: 'transparent',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+  },
+  headerTabButtonActive: {
+    backgroundColor: '#00FF87',
+  },
+  headerTabButtonText: {
+    color: 'rgba(255,255,255,0.6)',
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  headerTabButtonTextActive: {
+    color: '#0F1923',
+    fontWeight: '800',
+  },
+  modularCardsRow: {
+    flexDirection: 'column',
+    gap: 16,
+    marginBottom: 24,
+    width: '100%',
+  },
+  webModularCardsRow: {
+    flexDirection: 'row',
+  },
+  modularCard: {
+    flex: 1,
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.02)',
+  },
+  webModularCard: {
+    flex: 1,
+  },
+  cardTitle: {
+    color: Colors.text,
+    fontSize: 14,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 16,
+    opacity: 0.8,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  statDataBox: {
+    flex: 1,
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    borderRadius: 8,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.04)',
+  },
+  statDataNumber: {
+    color: '#00FF87',
+    fontSize: 24,
+    fontWeight: '900',
+  },
+  statDataLabel: {
+    color: Colors.gray,
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 4,
+  },
+  rankRoleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    gap: 16,
+  },
+  rankContainerInfo: {
+    alignItems: 'center',
+    gap: 4,
+    minWidth: 80,
+  },
+  rankIconDetail: {
+    width: 44,
+    height: 44,
+    resizeMode: 'contain',
+  },
+  rankNameDetail: {
+    color: Colors.text,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  rolesDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  rolesList: {
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  agentBadgeDetail: {
+    backgroundColor: 'rgba(0, 255, 135, 0.08)',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: 'rgba(0, 255, 135, 0.2)',
+    borderColor: 'rgba(0, 255, 135, 0.15)',
   },
-  agentBadgeText: {
+  agentBadgeTextDetail: {
     color: Colors.primary,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  verificationContainer: {
+    marginTop: 14,
+    width: '100%',
+  },
+  pendingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 179, 0, 0.08)',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 179, 0, 0.15)',
+  },
+  pendingText: {
+    color: '#FFB300',
     fontSize: 12,
     fontWeight: '700',
   },
-  bioBox: {
-    width: '100%',
-    padding: 16,
-    backgroundColor: Colors.background,
-    borderRadius: 8,
+  verifiedBadgeDetail: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 255, 135, 0.08)',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 135, 0.15)',
   },
-  bioText: {
+  verifiedText: {
+    color: '#00FF87',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  tabsContainer: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+    marginBottom: 20,
+    width: '100%',
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  tabButtonActive: {
+    borderBottomColor: Colors.primary,
+  },
+  tabButtonText: {
     color: Colors.gray,
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 12,
+    fontWeight: '700',
     textAlign: 'center',
   },
-  adminBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: 16,
-    width: '100%',
-    padding: 12,
-    borderWidth: 1,
-    borderColor: Colors.primary,
-    borderRadius: 8,
-    backgroundColor: 'rgba(0, 255, 135, 0.05)',
-  },
-  adminBtnText: {
+  tabButtonTextActive: {
     color: Colors.primary,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  historyBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: 16,
-    width: '100%',
-    padding: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.02)',
-  },
-  historyBtnText: {
-    color: Colors.text,
-    fontSize: 14,
-    fontWeight: '700',
   },
   reviewsSection: {
     backgroundColor: Colors.surface,
@@ -938,94 +1445,6 @@ const styles = StyleSheet.create({
     color: Colors.gray,
     fontSize: 13,
     lineHeight: 18,
-  },
-  verificationContainer: {
-    width: '100%',
-    alignItems: 'center',
-    marginVertical: 12,
-  },
-  verificationBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: Colors.primary,
-    borderRadius: 8,
-    backgroundColor: 'rgba(0, 255, 135, 0.05)',
-  },
-  verificationBtnText: {
-    color: Colors.primary,
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  pendingBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(255, 179, 0, 0.1)',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 179, 0, 0.2)',
-  },
-  pendingText: {
-    color: '#FFB300',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  verifiedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(0, 255, 135, 0.1)',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 255, 135, 0.2)',
-  },
-  verifiedText: {
-    color: '#00FF87',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  rejectedSubText: {
-    color: Colors.danger,
-    fontSize: 11,
-    fontWeight: '600',
-    marginTop: 6,
-    textAlign: 'center',
-  },
-  tabsContainer: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
-    marginBottom: 20,
-    marginTop: 10,
-    width: '100%',
-  },
-  tabButton: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-  tabButtonActive: {
-    borderBottomColor: Colors.primary,
-  },
-  tabButtonText: {
-    color: Colors.gray,
-    fontSize: 12,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  tabButtonTextActive: {
-    color: Colors.primary,
   },
   postCardSmall: {
     backgroundColor: Colors.surface,
@@ -1127,5 +1546,121 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     alignSelf: 'flex-end',
+  },
+  matchCard: {
+    backgroundColor: Colors.background,
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.04)',
+  },
+  matchCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  teammateInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  teammateAvatarWrapper: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#0F1923',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    overflow: 'hidden',
+  },
+  teammateAvatar: {
+    width: '100%',
+    height: '100%',
+  },
+  teammateName: {
+    color: Colors.text,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  matchDateText: {
+    color: Colors.gray,
+    fontSize: 11,
+    marginTop: 2,
+  },
+  feedbackBadgeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(255,255,255,0.01)',
+    borderRadius: 6,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.03)',
+  },
+  feedbackBadgeText: {
+    color: Colors.primary,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  feedbackExpiredText: {
+    color: Colors.gray,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  ratingFormContainer: {
+    backgroundColor: 'rgba(15, 25, 35, 0.4)',
+    borderRadius: 6,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.02)',
+  },
+  ratingFormLabel: {
+    color: Colors.text,
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  starRatingRow: {
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  starRatingIcon: {
+    padding: 2,
+  },
+  ratingTextInput: {
+    backgroundColor: '#0F1923',
+    color: Colors.text,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+    fontSize: 12,
+    height: 48,
+    textAlignVertical: 'top',
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.04)',
+  },
+  ratingSubmitBtn: {
+    backgroundColor: Colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 6,
+  },
+  ratingNegativeSubmitBtn: {
+    backgroundColor: Colors.danger,
+  },
+  ratingSubmitBtnText: {
+    color: '#0F1923',
+    fontSize: 12,
+    fontWeight: '900',
   },
 });

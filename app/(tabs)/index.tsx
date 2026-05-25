@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { RankType } from '@/constants/ranks';
 import { auth, db } from '@/firebaseConfig';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import ShinyText from '@/components/ShinyText';
 
 interface Lobby {
   id: string;
@@ -132,38 +133,7 @@ export default function DashboardScreen() {
     setIsModalOpen(true);
   };
 
-  const FilterModal = () => (
-    <Modal visible={activeFilterModal !== null} transparent animationType="fade" onRequestClose={() => setActiveFilterModal(null)}>
-      <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setActiveFilterModal(null)}>
-        <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>
-            {activeFilterModal === 'mode' ? 'Mod Seçin' : 'Rank Seçin'}
-          </Text>
-          <ScrollView>
-            {(activeFilterModal === 'mode' ? GAME_MODES : RANKS).map((item: any) => {
-              const label = typeof item === 'string' ? item : item.label;
-              const isSelected = activeFilterModal === 'mode' ? filterMode === item : filterRank.value === item.value;
-              
-              return (
-                <TouchableOpacity 
-                  key={label} 
-                  style={[styles.modalItem, isSelected && styles.modalItemSelected]}
-                  onPress={() => {
-                    if (activeFilterModal === 'mode') setFilterMode(item);
-                    else setFilterRank(item);
-                    setActiveFilterModal(null);
-                  }}
-                >
-                  <Text style={[styles.modalItemText, isSelected && styles.modalItemTextSelected]}>{label}</Text>
-                  {isSelected && <Ionicons name="checkmark" size={18} color={Colors.primary} />}
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
-      </TouchableOpacity>
-    </Modal>
-  );
+  // Removed old FilterModal component
 
   const renderEmpty = () => (
     <View style={styles.emptyContainer}>
@@ -202,18 +172,92 @@ export default function DashboardScreen() {
             keyExtractor={(item) => item.id}
             renderItem={renderLobby}
             ListEmptyComponent={renderEmpty}
+            ListHeaderComponentStyle={{ zIndex: 100, elevation: 10 }}
             ListHeaderComponent={
               <View style={styles.listHeader}>
-                {isWeb && <Text style={styles.pageTitle}>Aktif Lobiler</Text>}
-                <View style={styles.filtersRow}>
-                  <TouchableOpacity style={styles.filterButton} onPress={() => setActiveFilterModal('mode')}>
-                    <Text style={styles.filterButtonText}>{filterMode}</Text>
-                    <Ionicons name="chevron-down" size={16} color={Colors.gray} />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.filterButton} onPress={() => setActiveFilterModal('rank')}>
-                    <Text style={styles.filterButtonText}>{filterRank.label}</Text>
-                    <Ionicons name="chevron-down" size={16} color={Colors.gray} />
-                  </TouchableOpacity>
+                {isWeb && (
+                  <ShinyText
+                    text="Aktif Lobiler"
+                    style={styles.pageTitle}
+                    speed={3}
+                    delay={1.5}
+                    color="#ECE8E1"
+                    shineColor="#00FF87"
+                  />
+                )}
+                {activeFilterModal !== null && (
+                  <TouchableOpacity
+                    style={styles.dropdownBackdrop}
+                    activeOpacity={1}
+                    onPress={() => setActiveFilterModal(null)}
+                  />
+                )}
+                <View style={[styles.filtersRow, { zIndex: 10 }]}>
+                  {/* Mode Filter Wrapper */}
+                  <View style={{ position: 'relative', zIndex: activeFilterModal === 'mode' ? 20 : 1 }}>
+                    <TouchableOpacity 
+                      style={[styles.filterButton, activeFilterModal === 'mode' && styles.filterButtonActive]} 
+                      onPress={() => setActiveFilterModal(activeFilterModal === 'mode' ? null : 'mode')}
+                    >
+                      <Text style={styles.filterButtonText}>{filterMode}</Text>
+                      <Ionicons name="chevron-down" size={16} color={Colors.gray} />
+                    </TouchableOpacity>
+                    {activeFilterModal === 'mode' && (
+                      <View style={styles.dropdownMenu}>
+                        <ScrollView style={styles.dropdownScrollView} nestedScrollEnabled showsVerticalScrollIndicator={true}>
+                          {GAME_MODES.map((item) => {
+                            const isSelected = filterMode === item;
+                            return (
+                              <TouchableOpacity
+                                key={item}
+                                style={[styles.dropdownItem, isSelected && styles.dropdownItemSelected]}
+                                onPress={() => {
+                                  setFilterMode(item);
+                                  setActiveFilterModal(null);
+                                }}
+                              >
+                                <Text style={[styles.dropdownItemText, isSelected && styles.dropdownItemTextSelected]}>{item}</Text>
+                                {isSelected && <Ionicons name="checkmark" size={14} color={Colors.primary} />}
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </ScrollView>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Rank Filter Wrapper */}
+                  <View style={{ position: 'relative', zIndex: activeFilterModal === 'rank' ? 20 : 1 }}>
+                    <TouchableOpacity 
+                      style={[styles.filterButton, activeFilterModal === 'rank' && styles.filterButtonActive]} 
+                      onPress={() => setActiveFilterModal(activeFilterModal === 'rank' ? null : 'rank')}
+                    >
+                      <Text style={styles.filterButtonText}>{filterRank.label}</Text>
+                      <Ionicons name="chevron-down" size={16} color={Colors.gray} />
+                    </TouchableOpacity>
+                    {activeFilterModal === 'rank' && (
+                      <View style={styles.dropdownMenu}>
+                        <ScrollView style={styles.dropdownScrollView} nestedScrollEnabled showsVerticalScrollIndicator={true}>
+                          {RANKS.map((item) => {
+                            const isSelected = filterRank.value === item.value;
+                            return (
+                              <TouchableOpacity
+                                key={item.value}
+                                style={[styles.dropdownItem, isSelected && styles.dropdownItemSelected]}
+                                onPress={() => {
+                                  setFilterRank(item);
+                                  setActiveFilterModal(null);
+                                }}
+                              >
+                                <Text style={[styles.dropdownItemText, isSelected && styles.dropdownItemTextSelected]}>{item.label}</Text>
+                                {isSelected && <Ionicons name="checkmark" size={14} color={Colors.primary} />}
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </ScrollView>
+                      </View>
+                    )}
+                  </View>
                 </View>
               </View>
             }
@@ -237,7 +281,6 @@ export default function DashboardScreen() {
         )}
 
         <CreateLobbyModal isVisible={isModalOpen} onClose={() => setIsModalOpen(false)} />
-        <FilterModal />
       </View>
     </SafeAreaView>
   );
@@ -337,72 +380,56 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.5,
   },
-  // Modal Styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalContent: {
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    width: '100%',
-    maxWidth: 340,
-    maxHeight: '70%',
-    padding: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-  },
-  modalTitle: {
-    color: Colors.text,
-    fontSize: 18,
-    fontWeight: '800',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-  },
-  notificationButton: {
-    position: 'relative',
-    padding: 4,
-  },
-  badge: {
+  // Dropdown Styles
+  dropdownMenu: {
     position: 'absolute',
-    top: 4,
-    right: 4,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#FF4655',
-    borderWidth: 2,
-    borderColor: '#0F1923', // Match background color
-  },
-  modalItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 12,
+    top: 42,
+    left: 0,
+    width: 220,
+    maxHeight: 250,
+    backgroundColor: Colors.surface,
     borderRadius: 8,
-    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 5,
+    overflow: 'hidden',
   },
-  modalItemSelected: {
+  dropdownScrollView: {
+    maxHeight: 238,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  dropdownItemSelected: {
     backgroundColor: 'rgba(0, 255, 135, 0.05)',
   },
-  modalItemText: {
+  dropdownItemText: {
     color: Colors.gray,
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '600',
   },
-  modalItemTextSelected: {
+  dropdownItemTextSelected: {
     color: Colors.primary,
     fontWeight: '700',
+  },
+  filterButtonActive: {
+    borderColor: Colors.primary,
+  },
+  dropdownBackdrop: {
+    position: 'absolute',
+    top: -1000,
+    left: -1000,
+    right: -1000,
+    bottom: -3000,
+    backgroundColor: 'transparent',
+    zIndex: 5,
   },
 });

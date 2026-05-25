@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput, ScrollView, Image, Alert } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput, ScrollView, Image, Alert, Platform } from 'react-native';
 import { Colors } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { PrimaryButton } from './PrimaryButton';
@@ -37,10 +37,18 @@ export const EditProfileModal = ({ isVisible, onClose, userData }: EditProfileMo
     }
   }, [isVisible, userData]);
 
+  const showAlert = (title: string, message: string) => {
+    if (Platform.OS === 'web') {
+      window.alert(`${title}: ${message}`);
+    } else {
+      Alert.alert(title, message);
+    }
+  };
+
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('İzin Gerekli', 'Galeri izni verilmedi.');
+      showAlert('İzin Gerekli', 'Galeri izni verilmedi.');
       return;
     }
 
@@ -68,7 +76,7 @@ export const EditProfileModal = ({ isVisible, onClose, userData }: EditProfileMo
     if (!user) return;
 
     if (!username.trim()) {
-      Alert.alert('Hata', 'Kullanıcı adı boş olamaz.');
+      showAlert('Hata', 'Kullanıcı adı boş olamaz.');
       return;
     }
 
@@ -80,11 +88,11 @@ export const EditProfileModal = ({ isVisible, onClose, userData }: EditProfileMo
         mainAgents: selectedAgents,
         profilePicBase64: base64Image,
       });
-      Alert.alert('Başarılı', 'Profiliniz güncellendi.');
+      showAlert('Başarılı', 'Profiliniz güncellendi.');
       onClose();
     } catch (error) {
       console.error('Update error:', error);
-      Alert.alert('Hata', 'Profil güncellenirken bir sorun oluştu.');
+      showAlert('Hata', 'Profil güncellenirken bir sorun oluştu.');
     } finally {
       setLoading(false);
     }
@@ -170,8 +178,24 @@ export const EditProfileModal = ({ isVisible, onClose, userData }: EditProfileMo
 };
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(15, 25, 35, 0.9)', justifyContent: 'flex-end' },
-  container: { backgroundColor: Colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '90%' },
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 25, 35, 0.9)',
+    justifyContent: Platform.OS === 'web' ? 'center' : 'flex-end',
+    alignItems: Platform.OS === 'web' ? 'center' : 'stretch',
+    padding: Platform.OS === 'web' ? 20 : 0,
+  },
+  container: {
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderBottomLeftRadius: Platform.OS === 'web' ? 24 : 0,
+    borderBottomRightRadius: Platform.OS === 'web' ? 24 : 0,
+    padding: 24,
+    maxHeight: '90%',
+    width: '100%',
+    maxWidth: Platform.OS === 'web' ? 500 : '100%',
+  },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
   title: { color: Colors.text, fontSize: 20, fontWeight: '800' },
   avatarSection: { alignItems: 'center', marginBottom: 24 },

@@ -130,7 +130,7 @@ export default function CreatePostScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.header}>
+      <View style={[styles.header, isWeb && styles.webHeader]}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={Colors.text} />
         </TouchableOpacity>
@@ -240,6 +240,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  webHeader: {
+    paddingHorizontal: '25%',
+    paddingVertical: 20,
   },
   backButton: {
     padding: 8,

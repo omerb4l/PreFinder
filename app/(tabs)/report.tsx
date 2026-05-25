@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { auth, db } from '@/firebaseConfig';
 import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import ShinyText from '@/components/ShinyText';
 
 const REASONS = [
   "AFK / Oyundan Çıkma",
@@ -135,10 +136,18 @@ export default function ReportScreen() {
     fetchTeammates();
   }, []);
 
+  const showAlert = (title: string, message: string) => {
+    if (Platform.OS === 'web') {
+      window.alert(`${title}: ${message}`);
+    } else {
+      Alert.alert(title, message);
+    }
+  };
+
   const pickEvidenceImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('İzin Gerekli', 'Kanıt eklemek için galeri izni vermeniz gerekmektedir.');
+      showAlert('İzin Gerekli', 'Kanıt eklemek için galeri izni vermeniz gerekmektedir.');
       return;
     }
 
@@ -161,12 +170,12 @@ export default function ReportScreen() {
   const handleSubmit = async () => {
     const user = auth.currentUser;
     if (!user) {
-      Alert.alert('Hata', 'Şikayet göndermek için giriş yapmalısınız.');
+      showAlert('Hata', 'Şikayet göndermek için giriş yapmalısınız.');
       return;
     }
 
     if (!selectedUserId || !selectedReason) {
-      Alert.alert('Hata', 'Lütfen şikayet edilecek bir oyuncu ve şikayet nedenini seçin.');
+      showAlert('Hata', 'Lütfen şikayet edilecek bir oyuncu ve şikayet nedenini seçin.');
       return;
     }
 
@@ -184,7 +193,7 @@ export default function ReportScreen() {
         timestamp: serverTimestamp(),
       });
 
-      Alert.alert('Başarılı', 'Şikayetiniz alındı. İnceleme sonrası tarafınıza bilgi verilecektir.');
+      showAlert('Başarılı', 'Şikayetiniz alındı. İnceleme sonrası tarafınıza bilgi verilecektir.');
       
       // Reset form
       setSelectedUserId(null);
@@ -195,7 +204,7 @@ export default function ReportScreen() {
       setEvidenceImage(null);
     } catch (error) {
       console.error('Report submission error:', error);
-      Alert.alert('Hata', 'Şikayet gönderilirken bir sorun oluştu.');
+      showAlert('Hata', 'Şikayet gönderilirken bir sorun oluştu.');
     } finally {
       setLoading(false);
     }
@@ -210,7 +219,14 @@ export default function ReportScreen() {
       >
         <View style={styles.formContainer}>
           <View style={styles.header}>
-            <Text style={styles.title}>Oyuncu Şikayet Et</Text>
+            <ShinyText
+              text="Oyuncu Şikayet Et"
+              style={styles.title}
+              speed={3}
+              delay={1.5}
+              color="#ECE8E1"
+              shineColor="#00FF87"
+            />
             <Text style={styles.subtitle}>Sistemimizi temiz tutmamıza yardımcı olun.</Text>
           </View>
 
