@@ -23,6 +23,53 @@ const RANK_KEYS: RankType[] = [
   'diamond', 'ascendant', 'immortal', 'radiant'
 ];
 
+const compressImageWeb = (uri: string): Promise<string> => {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined') {
+      resolve(uri);
+      return;
+    }
+    const img = new window.Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(uri);
+        return;
+      }
+      
+      const MAX_WIDTH = 1000;
+      const MAX_HEIGHT = 1000;
+      let width = img.width;
+      let height = img.height;
+      
+      if (width > height) {
+        if (width > MAX_WIDTH) {
+          height = Math.round((height * MAX_WIDTH) / width);
+          width = MAX_WIDTH;
+        }
+      } else {
+        if (height > MAX_HEIGHT) {
+          width = Math.round((width * MAX_HEIGHT) / height);
+          height = MAX_HEIGHT;
+        }
+      }
+      
+      canvas.width = width;
+      canvas.height = height;
+      ctx.drawImage(img, 0, 0, width, height);
+      
+      const base64 = canvas.toDataURL('image/jpeg', 0.3);
+      resolve(base64);
+    };
+    img.onerror = () => {
+      resolve(uri);
+    };
+    img.src = uri;
+  });
+};
+
 export default function VerificationScreen() {
   const [riotId, setRiotId] = useState('');
   const [selectedRank, setSelectedRank] = useState<RankType>('platinum');
@@ -57,9 +104,22 @@ export default function VerificationScreen() {
       base64: true,
     });
 
-    if (!result.canceled) {
+    if (!result.canceled && result.assets && result.assets.length > 0) {
       setProfilePicUri(result.assets[0].uri);
-      setProfilePicBase64(result.assets[0].base64 || null);
+      if (Platform.OS === 'web') {
+        try {
+          const compressed = await compressImageWeb(result.assets[0].uri);
+          const cleanBase64 = compressed.startsWith('data:image') 
+            ? compressed.split(',')[1] 
+            : compressed;
+          setProfilePicBase64(cleanBase64);
+        } catch (err) {
+          console.warn('Web profile pic compression failed:', err);
+          setProfilePicBase64(result.assets[0].base64 || null);
+        }
+      } else {
+        setProfilePicBase64(result.assets[0].base64 || null);
+      }
     }
   };
 
@@ -79,7 +139,17 @@ export default function VerificationScreen() {
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
       setVerificationPicUri(result.assets[0].uri);
-      setVerificationPicBase64(`data:image/jpeg;base64,${result.assets[0].base64}`);
+      if (Platform.OS === 'web') {
+        try {
+          const compressed = await compressImageWeb(result.assets[0].uri);
+          setVerificationPicBase64(compressed);
+        } catch (err) {
+          console.warn('Web verification pic compression failed:', err);
+          setVerificationPicBase64(`data:image/jpeg;base64,${result.assets[0].base64}`);
+        }
+      } else {
+        setVerificationPicBase64(`data:image/jpeg;base64,${result.assets[0].base64}`);
+      }
     }
   };
 

@@ -33,8 +33,15 @@ export default function RegisterScreen() {
       setErrorMsg('Şifre boş bırakılamaz.');
       return;
     }
-    if (password.length < 6) {
-      setErrorMsg('Şifreniz en az 6 karakter olmalıdır.');
+    const hasUpperCase = /[A-Z]/.test(password);
+    const hasLowerCase = /[a-z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+    if (password.length < 8) {
+      setErrorMsg('Şifreniz en az 8 karakter olmalıdır.');
+      return;
+    }
+    if (!hasUpperCase || !hasLowerCase || !hasNumber) {
+      setErrorMsg('Şifreniz en az bir büyük harf, bir küçük harf ve bir rakam içermelidir.');
       return;
     }
     if (password !== confirmPassword) {
