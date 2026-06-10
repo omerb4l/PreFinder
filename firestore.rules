@@ -1,0 +1,77 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper: Check if user is logged in
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper: Check if the request is from the owner of the document
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Helper: Check if the user is an admin
+    function isAdmin() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // --- USERS COLLECTION ---
+    match /users/{userId} {
+      // Anyone authenticated can read user profiles (so they can see usernames, ranks, etc.)
+      allow read: if isAuthenticated();
+      // Users can only create or edit their own profile
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isOwner(userId) || isAdmin();
+      // Only admins can delete users
+      allow delete: if isAdmin();
+    }
+
+    // --- LOBBIES COLLECTION ---
+    match /lobbies/{lobbyId} {
+      // Authenticated users can read and create lobbies
+      allow read, create: if isAuthenticated();
+      // Lobbies can be updated/deleted by authenticated users (you can restrict to creatorId in the future)
+      allow update, delete: if isAuthenticated();
+    }
+
+    // --- REQUESTS (and MESSAGES) ---
+    match /requests/{requestId} {
+      // Requests can be read/written by authenticated users
+      allow read, write: if isAuthenticated();
+      
+      match /messages/{messageId} {
+        allow read, write: if isAuthenticated();
+      }
+    }
+
+    // --- REPORTS ---
+    match /reports/{reportId} {
+      // Any authenticated user can create reports
+      allow create: if isAuthenticated();
+      // Only admins can read, update, or delete reports
+      allow read, update, delete: if isAdmin();
+    }
+
+    // --- FORUM POSTS & COMMENTS ---
+    match /forum_posts/{postId} {
+      allow read, create: if isAuthenticated();
+      allow update, delete: if isAuthenticated();
+    }
+
+    match /forum_comments/{commentId} {
+      allow read, create: if isAuthenticated();
+      allow update, delete: if isAuthenticated();
+    }
+
+    // --- MATCH HISTORY ---
+    match /match_history/{matchId} {
+      allow read, create, update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+  }
+}

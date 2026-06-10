@@ -49,11 +49,18 @@ export default function DashboardScreen() {
   const isWeb = Platform.OS === 'web' && width >= 768;
   const isMobile = width < 768;
 
+  const [now, setNow] = useState(Date.now());
   const [themeMode, setThemeMode] = useState(getThemeMode());
-  
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [lobbies, setLobbies] = useState<Lobby[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNow(Date.now());
+    }, 30000); // update every 30 seconds to refresh remaining times and filters
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const unsub = subscribeTheme((t) => setThemeMode(t));
@@ -105,8 +112,11 @@ export default function DashboardScreen() {
       const maxWeight = RANK_WEIGHTS[lobby.maxRank] || 0;
       matchesRank = fWeight >= minWeight && fWeight <= maxWeight;
     }
+
+    const threeHoursAgo = now - 3 * 60 * 60 * 1000;
+    const matchesTime = !lobby.createdAt || lobby.createdAt.toMillis() >= threeHoursAgo;
     
-    return matchesMode && matchesRank;
+    return matchesMode && matchesRank && matchesTime;
   }).sort((a, b) => {
     // Pin user's own lobby to top
     const isAUser = a.creatorId === auth?.currentUser?.uid;
@@ -121,7 +131,11 @@ export default function DashboardScreen() {
   });
 
   const handleOpenCreateModal = () => {
-    const hasActiveLobby = lobbies.some(lobby => lobby.creatorId === auth?.currentUser?.uid);
+    const threeHoursAgo = Date.now() - 3 * 60 * 60 * 1000;
+    const hasActiveLobby = lobbies.some(lobby => 
+      lobby.creatorId === auth?.currentUser?.uid &&
+      (!lobby.createdAt || lobby.createdAt.toMillis() >= threeHoursAgo)
+    );
     
     if (hasActiveLobby) {
       const msg = "Zaten aktif bir lobiniz var. Yeni bir lobi kurmadan önce mevcut lobinizi kapatmalısınız.";
@@ -155,6 +169,7 @@ export default function DashboardScreen() {
       description={item.description}
       rating="4.8"
       index={index}
+      createdAt={item.createdAt}
     />
   );
 

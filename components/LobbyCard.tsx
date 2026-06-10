@@ -22,6 +22,7 @@ interface LobbyCardProps {
   rating: string;
   avatarUrl?: string;
   index?: number;
+  createdAt?: any;
 }
 
 export const LobbyCard = ({
@@ -35,7 +36,8 @@ export const LobbyCard = ({
   description,
   rating,
   avatarUrl,
-  index
+  index,
+  createdAt
 }: LobbyCardProps) => {
   const router = useRouter();
   const { width } = useWindowDimensions();
@@ -48,6 +50,42 @@ export const LobbyCard = ({
   const [creatorName, setCreatorName] = useState('Yükleniyor...');
   const [creatorPhoto, setCreatorPhoto] = useState<string | null>(null);
   const [reportModalVisible, setReportModalVisible] = useState(false);
+  const [timeLeftStr, setTimeLeftStr] = useState<string>('');
+
+  useEffect(() => {
+    if (!createdAt) {
+      setTimeLeftStr('Yeni');
+      return;
+    }
+
+    const calculateTimeLeft = () => {
+      const createdMs = createdAt.toMillis ? createdAt.toMillis() : (createdAt.seconds * 1000);
+      const totalDuration = 3 * 60 * 60 * 1000; // 3 hours
+      const elapsed = Date.now() - createdMs;
+      const remaining = totalDuration - elapsed;
+
+      if (remaining <= 0) {
+        return 'Süresi Doldu';
+      }
+
+      const hours = Math.floor(remaining / (60 * 60 * 1000));
+      const minutes = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000));
+      
+      if (hours > 0) {
+        return `${hours}s ${minutes}dk kaldı`;
+      } else {
+        return `${minutes}dk kaldı`;
+      }
+    };
+
+    setTimeLeftStr(calculateTimeLeft());
+
+    const interval = setInterval(() => {
+      setTimeLeftStr(calculateTimeLeft());
+    }, 30000); // update every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [createdAt]);
 
   useEffect(() => {
     const fetchCreatorData = async () => {
@@ -219,6 +257,16 @@ export const LobbyCard = ({
   );
 
   const renderActionButton = () => {
+    const isExpired = timeLeftStr === 'Süresi Doldu';
+
+    if (isExpired && !isOwnLobby) {
+      return (
+        <View style={[styles.actionButton, styles.actionButtonDisabled]}>
+          <Text style={[styles.actionButtonText, styles.actionButtonTextDisabled]}>Süresi Doldu</Text>
+        </View>
+      );
+    }
+
     if (isOwnLobby) {
       return (
         <TouchableOpacity
@@ -318,6 +366,12 @@ export const LobbyCard = ({
               <View style={styles.missingBadgeSmall}>
                 <Text style={styles.missingTextSmall}>{missingPlayers}</Text>
               </View>
+              {!!timeLeftStr && (
+                <View style={styles.timeBadgeSmall}>
+                  <Ionicons name="time-outline" size={12} color={Colors.primary} />
+                  <Text style={styles.timeTextSmall}>{timeLeftStr}</Text>
+                </View>
+              )}
               <Text style={styles.webRoleText}>{roleInfo}</Text>
             </View>
             {!!description && <Text style={styles.descriptionText} numberOfLines={1}>{description}</Text>}
@@ -370,8 +424,16 @@ export const LobbyCard = ({
           >
             <Text style={styles.mobileNameText}>{creatorName}</Text>
           </TouchableOpacity>
-          <View style={styles.mobileModeBadge}>
-            <Text style={styles.mobileModeText}>{gameMode}</Text>
+          <View style={styles.mobileBadgesRow}>
+            <View style={styles.mobileModeBadge}>
+              <Text style={styles.mobileModeText}>{gameMode}</Text>
+            </View>
+            {!!timeLeftStr && (
+              <View style={styles.mobileTimeBadge}>
+                <Ionicons name="time-outline" size={12} color={Colors.primary} />
+                <Text style={styles.mobileTimeText}>{timeLeftStr}</Text>
+              </View>
+            )}
           </View>
           <View style={styles.row}>
             <Text style={styles.missingPlayersText}>{missingPlayers}</Text>
@@ -644,13 +706,52 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 4,
-    alignSelf: 'flex-start',
-    marginBottom: 8,
     borderWidth: 1,
     borderColor: '#FF4655',
   },
   mobileModeText: {
     color: '#FF4655',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  timeBadgeSmall: {
+    backgroundColor: 'rgba(0, 255, 135, 0.08)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginRight: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 135, 0.15)',
+  },
+  timeTextSmall: {
+    color: Colors.primary,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  mobileBadgesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  mobileTimeBadge: {
+    backgroundColor: 'rgba(0, 255, 135, 0.08)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 135, 0.15)',
+  },
+  mobileTimeText: {
+    color: Colors.primary,
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.5,

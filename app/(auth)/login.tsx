@@ -114,6 +114,14 @@ export default function LoginScreen() {
               secureTextEntry
             />
 
+            <View style={styles.forgotPasswordRow}>
+              <Link href={"/forgot-password" as any} asChild>
+                <TouchableOpacity>
+                  <Text style={styles.forgotPasswordText}>Şifremi Unuttum</Text>
+                </TouchableOpacity>
+              </Link>
+            </View>
+
             {/* Inline error — works on both Web and Mobile */}
             {errorMsg !== '' && (
               <View style={styles.errorBox}>
@@ -187,5 +195,15 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     fontSize: 14,
     fontWeight: '600',
+  },
+  forgotPasswordRow: {
+    alignItems: 'flex-end',
+    marginBottom: 16,
+    marginTop: -8,
+  },
+  forgotPasswordText: {
+    color: Colors.gray,
+    fontSize: 13,
+    fontWeight: '500',
   },
 });

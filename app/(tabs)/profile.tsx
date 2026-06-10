@@ -6,6 +6,7 @@ import { Colors, getThemeMode, subscribeTheme } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { VALORANT_RANKS } from '@/constants/ranks';
 import { auth, db } from '@/firebaseConfig';
+import { signOut } from 'firebase/auth';
 import { doc, onSnapshot, collection, query, where, getDocs, getDoc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { EditProfileModal } from '@/components/EditProfileModal';
 import { PrimaryButton } from '@/components/PrimaryButton';
@@ -62,6 +63,32 @@ export default function ProfileScreen() {
   const [matches, setMatches] = useState<any[]>([]);
   const [loadingMatches, setLoadingMatches] = useState(false);
   const [ratingStates, setRatingStates] = useState<Record<string, { rating: number; note: string; submitting: boolean }>>({});
+
+  const handleLogout = async () => {
+    const performSignOut = async () => {
+      try {
+        await signOut(auth);
+        router.replace('/login');
+      } catch (error) {
+        console.error("Logout error:", error);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm("Çıkış yapmak istediğinize emin misiniz?")) {
+        await performSignOut();
+      }
+    } else {
+      Alert.alert(
+        "Çıkış Yap",
+        "Hesabınızdan çıkış yapmak istediğinize emin misiniz?",
+        [
+          { text: "İptal", style: "cancel" },
+          { text: "Çıkış Yap", style: "destructive", onPress: performSignOut }
+        ]
+      );
+    }
+  };
 
   // 1. Listen for user document changes
   useEffect(() => {
@@ -634,6 +661,17 @@ export default function ProfileScreen() {
                 >
                   <Text style={styles.headerTabButtonText}>
                     Yönetim Paneli
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              {isOwnProfile && (
+                <TouchableOpacity 
+                  style={styles.headerTabButton}
+                  onPress={handleLogout}
+                >
+                  <Text style={[styles.headerTabButtonText, { color: Colors.danger }]}>
+                    Çıkış Yap
                   </Text>
                 </TouchableOpacity>
               )}
