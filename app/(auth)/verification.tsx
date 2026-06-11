@@ -9,7 +9,7 @@ import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { VALORANT_RANKS, RankType } from '@/constants/ranks';
 import { auth, db } from '@/firebaseConfig';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 
 const ROLES = [
   { id: 'Düellocu', name: 'Düellocu' },
@@ -179,7 +179,7 @@ export default function VerificationScreen() {
     setLoading(true);
     try {
       const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, {
+      await setDoc(userRef, {
         riotId: riotId.trim(),
         rank: selectedRank,
         mainAgents: mainRoles,
@@ -187,7 +187,7 @@ export default function VerificationScreen() {
         verificationStatus: 'pending',
         rankProofImageUrl: verificationPicBase64,
         rankSubmitted: selectedRank
-      });
+      }, { merge: true });
       
       showAlert('Başarılı', 'Profiliniz ve rütbe kanıtınız başarıyla gönderildi! Lobi kurabilmek ve katılabilmek için admin onayını bekleyiniz.');
       router.replace('/(tabs)');

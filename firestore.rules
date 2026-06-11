@@ -26,7 +26,11 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       // Users can only create or edit their own profile
       allow create: if isAuthenticated() && request.auth.uid == userId;
-      allow update: if isOwner(userId) || isAdmin();
+      allow update: if isOwner(userId) || isAdmin() || (
+        isAuthenticated() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lobbiesJoined']) &&
+        request.resource.data.lobbiesJoined == resource.data.get('lobbiesJoined', 0) + 1
+      );
       // Only admins can delete users
       allow delete: if isAdmin();
     }
