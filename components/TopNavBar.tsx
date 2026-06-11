@@ -8,10 +8,11 @@ import { doc, onSnapshot } from 'firebase/firestore';
 
 interface TopNavBarProps {
   onOpenNotifications: () => void;
+  onOpenAIChatbot: () => void;
   hasUnread?: boolean;
 }
 
-export const TopNavBar = ({ onOpenNotifications, hasUnread = false }: TopNavBarProps) => {
+export const TopNavBar = ({ onOpenNotifications, onOpenAIChatbot, hasUnread = false }: TopNavBarProps) => {
   const router = useRouter();
   const pathname = usePathname();
   const { width } = useWindowDimensions();
@@ -95,6 +96,13 @@ export const TopNavBar = ({ onOpenNotifications, hasUnread = false }: TopNavBarP
             size={22} 
             color={Colors.text} 
           />
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.iconButton}
+          onPress={onOpenAIChatbot}
+        >
+          <Ionicons name="sparkles-outline" size={22} color={Colors.primary} />
         </TouchableOpacity>
         
         <TouchableOpacity 

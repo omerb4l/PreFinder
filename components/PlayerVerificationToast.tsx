@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   webWrapper: {
-    bottom: 24,
+    bottom: 90,
     left: 24,
     width: 320,
   },

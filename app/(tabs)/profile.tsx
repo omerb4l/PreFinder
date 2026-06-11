@@ -549,7 +549,7 @@ export default function ProfileScreen() {
           backgroundSize: '30px 30px',
         } as any
       ]} 
-      edges={['left', 'right', 'bottom']}
+      edges={['left', 'right']}
     >
       
       {!isOwnProfile && (
@@ -1073,7 +1073,7 @@ export default function ProfileScreen() {
           userData={userData}
         />
 
-        <View style={{ height: 60 }} />
+        <View style={{ height: 20 }} />
       </ScrollView>
     </SafeAreaView>
   );

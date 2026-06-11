@@ -211,7 +211,7 @@ export default function ReportScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
+    <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
       <ScrollView 
         style={styles.container} 
         contentContainerStyle={[styles.contentPadding, isWeb && styles.webContentPadding]}

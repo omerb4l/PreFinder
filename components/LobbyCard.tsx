@@ -352,14 +352,14 @@ export const LobbyCard = ({
                 <Ionicons name="person" size={18} color={Colors.gray} />
               )}
             </View>
-            <View>
-              <Text style={styles.webIdText}>{creatorName}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.webIdText} numberOfLines={1} ellipsizeMode="tail">{creatorName}</Text>
               <Text style={styles.webRatingText}>⭐ {rating}</Text>
             </View>
           </TouchableOpacity>
 
           <View style={styles.webCenterLeft}>
-            <View style={styles.row}>
+            <View style={[styles.row, { flexWrap: 'wrap' }]}>
               <View style={styles.webModeBadge}>
                 <Text style={styles.webModeText}>{gameMode}</Text>
               </View>
@@ -372,7 +372,7 @@ export const LobbyCard = ({
                   <Text style={styles.timeTextSmall}>{timeLeftStr}</Text>
                 </View>
               )}
-              <Text style={styles.webRoleText}>{roleInfo}</Text>
+              <Text style={[styles.webRoleText, { flex: 1 }]} numberOfLines={1} ellipsizeMode="tail">{roleInfo}</Text>
             </View>
             {!!description && <Text style={styles.descriptionText} numberOfLines={1}>{description}</Text>}
           </View>
@@ -422,7 +422,7 @@ export const LobbyCard = ({
               router.push({ pathname: '/profile', params: { targetUserId: creatorId } });
             }}
           >
-            <Text style={styles.mobileNameText}>{creatorName}</Text>
+            <Text style={styles.mobileNameText} numberOfLines={1} ellipsizeMode="tail">{creatorName}</Text>
           </TouchableOpacity>
           <View style={styles.mobileBadgesRow}>
             <View style={styles.mobileModeBadge}>
@@ -435,9 +435,9 @@ export const LobbyCard = ({
               </View>
             )}
           </View>
-          <View style={styles.row}>
+          <View style={[styles.row, { flexWrap: 'wrap' }]}>
             <Text style={styles.missingPlayersText}>{missingPlayers}</Text>
-            <Text style={styles.roleTextMobile}> • {roleInfo}</Text>
+            <Text style={[styles.roleTextMobile, { flex: 1 }]} numberOfLines={1} ellipsizeMode="tail"> • {roleInfo}</Text>
           </View>
 
           {!!description && (
@@ -735,6 +735,7 @@ const styles = StyleSheet.create({
   },
   mobileBadgesRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: 8,
     marginBottom: 8,

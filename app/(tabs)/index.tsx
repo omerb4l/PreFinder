@@ -174,7 +174,7 @@ export default function DashboardScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
+    <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
       <View style={styles.root}>
         {loading ? (
           <View style={styles.loadingContainer}>
@@ -324,7 +324,7 @@ const styles = StyleSheet.create({
   },
   contentPadding: {
     padding: 20,
-    paddingBottom: 120,
+    paddingBottom: 20,
   },
   webContentPadding: {
     paddingHorizontal: '15%',

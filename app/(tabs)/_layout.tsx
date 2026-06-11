@@ -9,6 +9,7 @@ import { NotificationsModal } from '@/components/NotificationsModal';
 import { CreateLobbyModal } from '@/components/CreateLobbyModal';
 import { PlayerVerificationToast } from '@/components/PlayerVerificationToast';
 import { FloatingChat } from '@/components/FloatingChat';
+import { AIChatbot } from '@/components/AIChatbot';
 import { auth, db } from '@/firebaseConfig';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 
@@ -17,6 +18,7 @@ export default function TabLayout() {
   const isMobile = width < 768;
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isLobbyModalOpen, setIsLobbyModalOpen] = useState(false);
+  const [isAIChatbotOpen, setIsAIChatbotOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [themeMode, setThemeMode] = useState(getThemeMode());
 
@@ -71,6 +73,13 @@ export default function TabLayout() {
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <TouchableOpacity 
+            onPress={() => setIsAIChatbotOpen(true)}
+            style={styles.iconButton}
+          >
+            <Ionicons name="sparkles-outline" size={24} color={Colors.primary} />
+          </TouchableOpacity>
+
+          <TouchableOpacity 
             onPress={() => setIsNotificationsOpen(true)}
             style={styles.iconButton}
           >
@@ -90,6 +99,7 @@ export default function TabLayout() {
       {!isMobile && (
         <TopNavBar 
           onOpenNotifications={() => setIsNotificationsOpen(true)} 
+          onOpenAIChatbot={() => setIsAIChatbotOpen(true)}
           hasUnread={unreadCount > 0} 
         />
       )}
@@ -172,6 +182,11 @@ export default function TabLayout() {
       <PlayerVerificationToast />
 
       <FloatingChat />
+
+      <AIChatbot 
+        isVisible={isAIChatbotOpen}
+        onClose={() => setIsAIChatbotOpen(false)}
+      />
     </View>
   );
 }
